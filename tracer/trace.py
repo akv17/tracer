@@ -122,12 +122,10 @@ class Patcher:
             attr_obj = getattr(obj, attr_name)
             if callable(attr_obj) and not _is_dunder(attr_name):
                 attr_full_name = self._get_full_obj_name(attr_obj)
-                attr_obj = self._dispatch_wrap(attr_obj, attr_full_name)
-
-                if attr_full_name not in self._already_wrapped:
-                    attr_obj, was_wrapped = self._wrap(attr_obj)
+                attr_obj, was_wrapped = self._dispatch_wrap(attr_obj, attr_full_name)
+                log_msg = f'patching method `{attr_name}` of `{obj_name}`.'
+                if was_wrapped:
                     setattr(obj, attr_name, attr_obj)
-                    log_msg = f'patching method `{attr_name}` of `{obj_name}`.'
 
         if was_wrapped:
             self._logger.debug(log_msg)
