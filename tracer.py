@@ -236,7 +236,7 @@ class Patcher(LoggingMixin):
         def wrapper(*args, **kwargs):
             self._logger.debug(f'tracing `{obj_name}`.')
             rv = obj(*args, **kwargs)
-            matches = self._match_targets(obj_name, *args, track_stack=self.track_stack, **kwargs)
+            matches = self._match_targets(obj_name, *args, **kwargs)
             if self.track_stack:
                 self._set_stack(matches=matches)
             return rv
