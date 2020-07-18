@@ -22,7 +22,7 @@ class TestTracing(unittest.TestCase):
             'tests.test_proj.baz.baz.buzz',
             'tests.test_proj.main.main'
         ])
-        # in execution order.
+        # in reversed execution order.
         self.expected_matches = [
             {'target': 2, 'obj_name': 'tests.test_proj.foo.Foo.foo'},
             {'target': -2, 'obj_name': 'tests.test_proj.bar.bar'},
