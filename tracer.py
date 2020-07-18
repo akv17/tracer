@@ -1,4 +1,5 @@
 import importlib
+import inspect
 import json
 import logging
 import os
@@ -18,7 +19,7 @@ class Match:
         arg_id=None,
         target=None,
         value=None,
-        matcher_type=None
+        matcher_type=None,
     ):
         self.obj_name = obj_name
         self.args_spec = args_spec
@@ -28,6 +29,7 @@ class Match:
         self.matcher_type = matcher_type
         self.timestamp = datetime.now()
         self.arg_type = type(self.value)
+        self.stack = None
 
     def __repr__(self):
         vars_ = ', '.join(f'{k}={v}' for k, v in vars(self).items())
@@ -163,9 +165,10 @@ class GenericMatcher(BaseMatcher):
 
 class Patcher(LoggingMixin):
 
-    def __init__(self, top_package, matchers):
+    def __init__(self, top_package, matchers, track_stack=False):
         self.top_package = top_package
         self.matchers = matchers
+        self.track_stack = track_stack
         self._wrapped = set()
 
     @property
@@ -193,6 +196,16 @@ class Patcher(LoggingMixin):
 
         return f'{mod_name}.{name}'
 
+    @staticmethod
+    def _set_stack(matches):
+        stack = inspect.stack()
+        frames = [
+            {'filename': f.filename, 'lineno': f.lineno, 'function': f.frame.f_locals.get('obj_name', f.function)}
+            for f in stack[1:]
+        ]
+        for m in matches:
+            m.stack = frames
+
     def _match_targets(self, obj_name, *args, **kwargs):
         matches = []
         for matcher in self.matchers:
@@ -207,7 +220,9 @@ class Patcher(LoggingMixin):
         def wrapper(*args, **kwargs):
             self._logger.debug(f'tracing `{obj_name}`.')
             rv = obj(*args, **kwargs)
-            self._match_targets(obj_name, *args, **kwargs)
+            matches = self._match_targets(obj_name, *args, track_stack=self.track_stack, **kwargs)
+            if self.track_stack:
+                self._set_stack(matches=matches)
             return rv
 
         return wrapper
@@ -280,13 +295,22 @@ class Tracer(LoggingMixin):
         exec(co)
 
     def report(self, fp=None):
+        def _serialize(val):
+            if isinstance(val, datetime):
+                val = str(val)
+            try:
+                json.dumps(val)
+            except TypeError:
+                val = repr(val)
+            return val
+
         rv = {}
         trg_map = {}
         for m in self.matches:
             trg_map.setdefault(str(m.target), []).append(m)
 
         for trg, trg_matches in trg_map.items():
-            rv[trg] = [{k: str(v) for k, v in vars(m).items()} for m in trg_matches]
+            rv[trg] = [{k: _serialize(v) for k, v in vars(m).items()} for m in trg_matches]
 
         fp = fp or self._REPORT_FP
         with open(fp, 'w') as f:
@@ -299,14 +323,15 @@ def trace(
     targets,
     report_fp=None,
     debug=False,
-    do_report=True
+    do_report=True,
+    track_stack=False
 ):
     if debug:
         LoggingMixin.LEVEL = logging.DEBUG
 
     top_package = mn.split('.')[0]
     tree = ModuleTree(top_package=top_package, entry_mod_name=mn)
-    patcher = Patcher(top_package=top_package, matchers=[GenericMatcher(targets)])
+    patcher = Patcher(top_package=top_package, matchers=[GenericMatcher(targets)], track_stack=track_stack)
     tracer = Tracer(tree=tree, patcher=patcher)
     tracer.exec(fcall)
 
