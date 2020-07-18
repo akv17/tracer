@@ -258,7 +258,7 @@ class Patcher(LoggingMixin):
 
 
 class Tracer(LoggingMixin):
-    _REPORT_FP = '.traces.json'
+    _REPORT_FP = 'traces.json'
 
     def __init__(self, tree, patcher):
         self.tree = tree
@@ -299,7 +299,7 @@ def trace(
     targets,
     report_fp=None,
     debug=False,
-    do_report=False
+    do_report=True
 ):
     if debug:
         LoggingMixin.LEVEL = logging.DEBUG
