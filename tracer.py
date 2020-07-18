@@ -157,10 +157,26 @@ class BaseMatcher(LoggingMixin):
         return matches
 
 
-class GenericMatcher(BaseMatcher):
+class EqualsMatcher(BaseMatcher):
 
     def _match_arg(self, arg_val, target):
         return arg_val == target
+
+
+class ContainsMatcher(BaseMatcher):
+
+    def _match_arg(self, arg_val, target):
+        return target in arg_val if hasattr(arg_val, '__contains__') else False
+
+
+class AttrEqualsMatcher(BaseMatcher):
+
+    def __init__(self, attr_name, targets):
+        super().__init__(targets=targets)
+        self.attr_name = attr_name
+
+    def _match_arg(self, arg_val, target):
+        return getattr(arg_val, self.attr_name) == target if hasattr(arg_val, self.attr_name) else False
 
 
 class Patcher(LoggingMixin):
@@ -331,7 +347,12 @@ def trace(
 
     top_package = mn.split('.')[0]
     tree = ModuleTree(top_package=top_package, entry_mod_name=mn)
-    patcher = Patcher(top_package=top_package, matchers=[GenericMatcher(targets)], track_stack=track_stack)
+    matchers = [
+        EqualsMatcher(targets),
+        ContainsMatcher(targets),
+        AttrEqualsMatcher(attr_name='value', targets=targets)
+    ]
+    patcher = Patcher(top_package=top_package, matchers=matchers, track_stack=track_stack)
     tracer = Tracer(tree=tree, patcher=patcher)
     tracer.exec(fcall)
 
