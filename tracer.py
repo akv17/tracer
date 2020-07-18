@@ -217,14 +217,15 @@ class Patcher(LoggingMixin):
             obj, was_wrapped = self._dispatch_wrap(obj, obj_name)
             log_msg = f'patching function `{obj_name}`.'
 
-        for attr_name in dir(obj):
-            attr_obj = getattr(obj, attr_name)
-            if callable(attr_obj) and not _is_dunder(attr_name):
-                attr_full_name = self._get_full_obj_name(attr_obj)
-                attr_obj, was_wrapped = self._dispatch_wrap(attr_obj, attr_full_name)
-                log_msg = f'patching method `{attr_name}` of `{obj_name}`.'
-                if was_wrapped:
-                    setattr(obj, attr_name, attr_obj)
+        else:
+            for attr_name in dir(obj):
+                attr_obj = getattr(obj, attr_name)
+                if callable(attr_obj) and not _is_dunder(attr_name):
+                    attr_full_name = self._get_full_obj_name(attr_obj)
+                    attr_obj, was_wrapped = self._dispatch_wrap(attr_obj, attr_full_name)
+                    log_msg = f'patching method `{attr_name}` of `{obj_name}`.'
+                    if was_wrapped:
+                        setattr(obj, attr_name, attr_obj)
 
         if was_wrapped:
             self._logger.debug(log_msg)
