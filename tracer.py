@@ -6,7 +6,6 @@ from abc import abstractmethod
 from collections import deque
 from datetime import datetime
 from functools import wraps
-from pathlib import Path
 from types import FunctionType
 
 
@@ -58,8 +57,7 @@ class LoggingMixin:
 
 class ModuleTree(LoggingMixin):
 
-    def __init__(self, project_root, top_package, entry_mod_name):
-        self.project_root = project_root
+    def __init__(self, top_package, entry_mod_name):
         self.top_package = top_package
         self.entry_mod_name = entry_mod_name
         self.entry_mod = None
@@ -306,9 +304,8 @@ def trace(
     if debug:
         LoggingMixin.LEVEL = logging.DEBUG
 
-    proj_root = Path(__file__).parent.parent.as_posix()
     top_package = mn.split('.')[0]
-    tree = ModuleTree(top_package=top_package, project_root=proj_root, entry_mod_name=mn)
+    tree = ModuleTree(top_package=top_package, entry_mod_name=mn)
     patcher = Patcher(top_package=top_package, matchers=[GenericMatcher(targets)])
     tracer = Tracer(tree=tree, patcher=patcher)
     tracer.exec(fcall)
