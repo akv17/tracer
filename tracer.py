@@ -1,25 +1,17 @@
-import os
 import importlib
-import logging
 import json
+import logging
+import os
 from abc import abstractmethod
-from pathlib import Path
-from functools import wraps
 from collections import deque
-from types import FunctionType
 from datetime import datetime
+from functools import wraps
+from pathlib import Path
+from types import FunctionType
 
 
 def _is_dunder(name):
     return name.startswith('__') and name.endswith('__')
-
-
-def _spawn_cls_logger(cls, level=logging.DEBUG):
-    logging.basicConfig()
-    name = f'{cls.__module__}.{cls.__name__}'
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    return logger
 
 
 class Match:
@@ -47,14 +39,25 @@ class Match:
         return f'{self.__class__.__name__}({vars_})'
 
 
-class ProjectTree:
+class LoggingMixin:
+    _LOG_LEVEL = logging.DEBUG
+
+    def _spawn_logger(self):
+        logging.basicConfig()
+        cls = self.__class__
+        name = f'{cls.__module__}.{cls.__name__}'
+        self._logger = logging.getLogger(name)
+        self._logger.setLevel(self._LOG_LEVEL)
+
+
+class ProjectTree(LoggingMixin):
 
     def __init__(self, project_root, entry_mod_name):
         self.project_root = project_root
         self.entry_mod_name = entry_mod_name
         self.entry_mod = None
         self.top_package = entry_mod_name.split('.')[0]
-        self._logger = _spawn_cls_logger(self.__class__)
+        self._spawn_logger()
 
     def _parse_mod_imports(self, src, mod_name):
         names = []
@@ -73,6 +76,10 @@ class ProjectTree:
 
     def _get_imports(self, mod_name):
         mod_path = mod_name.replace('.', os.path.sep) + '.py'
+        if not os.path.exists(mod_path):
+            msg = f'no module `{mod_name}` at inferred path `{mod_path}`.'
+            raise Exception(msg)
+
         with open(mod_path, 'r') as f:
             src = f.read()
             imps = self._parse_mod_imports(src, mod_name=mod_name)
@@ -93,12 +100,12 @@ class ProjectTree:
                 self.entry_mod = mod
 
 
-class BaseMatcher:
+class BaseMatcher(LoggingMixin):
 
     def __init__(self, targets):
         self.targets = targets
         self.matches = []
-        self._logger = _spawn_cls_logger(self.__class__)
+        self._spawn_logger()
 
     @abstractmethod
     def _match_arg(self, arg_val, target):
@@ -146,12 +153,12 @@ class GenericMatcher(BaseMatcher):
         return arg_val == target
 
 
-class Patcher:
+class Patcher(LoggingMixin):
 
     def __init__(self, matchers):
         self.matchers = matchers
-        self._logger = _spawn_cls_logger(self.__class__)
         self._already_wrapped = set()
+        self._spawn_logger()
 
     @property
     def matches(self):
@@ -232,14 +239,13 @@ class Patcher:
         return mod
 
 
-class Tracer:
-    _REPORT_FNAME = '.traces.json'
+class Tracer(LoggingMixin):
+    _REPORT_FP = '.traces.json'
 
-    def __init__(self, func_name, tree, patcher):
-        self.func_name = func_name
+    def __init__(self, tree, patcher):
         self.tree = tree
         self.patcher = patcher
-        self._logger = _spawn_cls_logger(self.__class__)
+        self._spawn_logger()
 
     @property
     def matches(self):
@@ -251,12 +257,12 @@ class Tracer:
         msg = f'setup tracer of package `{self.tree.top_package}` patching {self.patcher.num_patched} objects.'
         self._logger.debug(msg)
 
-    def exec(self, **kwargs):
+    def exec(self, fcall):
         self._setup()
-        rv = getattr(self.tree.entry_mod, self.func_name)(**kwargs)
-        return rv
+        co = f'from {self.tree.entry_mod_name} import *; {fcall}'
+        exec(co)
 
-    def report(self):
+    def report(self, fp=None):
         rv = {}
         trg_map = {}
         for m in self.matches:
@@ -265,15 +271,16 @@ class Tracer:
         for trg, trg_matches in trg_map.items():
             rv[trg] = [{k: str(v) for k, v in vars(m).items()} for m in trg_matches]
 
-        with open(self._REPORT_FNAME, 'w') as f:
+        fp = fp or self._REPORT_FP
+        with open(fp, 'w') as f:
             json.dump(rv, f)
 
 
-def trace(mn, fn, target, **kwargs):
+def trace(mn, fcall, target, report_fp=None):
     proj_root = Path(__file__).parent.parent.as_posix()
     tree = ProjectTree(project_root=proj_root, entry_mod_name=mn)
     patcher = Patcher(matchers=[GenericMatcher([target])])
-    tracer = Tracer(func_name=fn, tree=tree, patcher=patcher)
-    rv = tracer.exec(**kwargs)
-    tracer.report()
-    return rv
+    tracer = Tracer(tree=tree, patcher=patcher)
+    tracer.exec(fcall)
+    tracer.report(fp=report_fp)
+    return tracer.matches
