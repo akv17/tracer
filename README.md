@@ -8,7 +8,7 @@ def foo(val):
     return -val
 
 
-def bar(val, pw=2):
+def bar(val, pw=3):
     return val ** pw
 
 
