@@ -323,7 +323,8 @@ class Tracer(LoggingMixin):
         rv = {}
         trg_map = {}
         for m in self.matches:
-            trg_map.setdefault(str(m.target), []).append(m)
+            key = _serialize(m.target)
+            trg_map.setdefault(key, []).append(m)
 
         for trg, trg_matches in trg_map.items():
             rv[trg] = [{k: _serialize(v) for k, v in vars(m).items()} for m in trg_matches]
