@@ -43,8 +43,10 @@ if __name__ == '__main__':
     arg_parser.add_argument('-t', type=str, help='target to trace.', required=True)
     arg_parser.add_argument('--o', type=str, help='report json file path.', default=None)
     arg_parser.add_argument('--ttype', type=str, help='target type cast function (default `str`).', default='str')
+    arg_parser.add_argument('--d', type=int, help='enable debug', default=0)
     args = arg_parser.parse_args()
 
     mn, fcall = parse_expr(args.e)
     target = cast_target(val=args.t, cast_func=args.ttype)
-    trace(mn=mn, fcall=fcall, target=target, report_fp=args.o)
+    debug = bool(args.d)
+    trace(mn=mn, fcall=fcall, target=target, report_fp=args.o, debug=debug)
