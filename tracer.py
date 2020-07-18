@@ -10,10 +10,6 @@ from pathlib import Path
 from types import FunctionType
 
 
-def _is_dunder(name):
-    return name.startswith('__') and name.endswith('__')
-
-
 class Match:
 
     def __init__(
@@ -41,13 +37,23 @@ class Match:
 
 class LoggingMixin:
     LEVEL = logging.INFO
+    FORMATTER = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+    STREAM_HANDLER = logging.StreamHandler()
+    STREAM_HANDLER.setFormatter(FORMATTER)
 
-    def _spawn_logger(self):
-        logging.basicConfig()
-        cls = self.__class__
-        name = f'{cls.__module__}.{cls.__name__}'
-        self._logger = logging.getLogger(name)
-        self._logger.setLevel(self.LEVEL)
+    @property
+    def _logger(self):
+        return self._get_logger()
+
+    def _get_logger(self):
+        if not hasattr(self, '__logger'):
+            cls = self.__class__
+            name = f'{cls.__module__}.{cls.__name__}'
+            self.__logger = logging.getLogger(name)
+            self.__logger.setLevel(self.LEVEL)
+            self.__logger.addHandler(self.STREAM_HANDLER)
+
+        return self.__logger
 
 
 class ProjectTree(LoggingMixin):
@@ -58,7 +64,6 @@ class ProjectTree(LoggingMixin):
         self.entry_mod_name = entry_mod_name
         self.entry_mod = None
         self._imported = set()
-        self._spawn_logger()
 
     def _parse_mod_imports(self, src, mod_name):
         names = []
@@ -89,7 +94,7 @@ class ProjectTree(LoggingMixin):
     def _import_mod(self, mod_name):
         mod = importlib.import_module(mod_name)
         self._imported.add(mod_name)
-        self._logger.debug(f'visiting module `{mod_name}`.')
+        self._logger.debug(f'imported module `{mod_name}`.')
         return mod
 
     def __iter__(self):
@@ -111,7 +116,6 @@ class BaseMatcher(LoggingMixin):
     def __init__(self, targets):
         self.targets = targets
         self.matches = []
-        self._spawn_logger()
 
     @abstractmethod
     def _match_arg(self, arg_val, target):
@@ -165,7 +169,6 @@ class Patcher(LoggingMixin):
         self.top_package = top_package
         self.matchers = matchers
         self._wrapped = set()
-        self._spawn_logger()
 
     @property
     def matches(self):
@@ -174,6 +177,23 @@ class Patcher(LoggingMixin):
     @property
     def num_patched(self):
         return len(self._wrapped)
+
+    @staticmethod
+    def _is_dunder(name):
+        return name.startswith('__') and name.endswith('__')
+
+    @staticmethod
+    def _get_full_obj_name(obj):
+        mod_name = obj.__module__ if hasattr(obj, '__module__') else ''
+
+        if hasattr(obj, '__qualname__'):
+            name = obj.__qualname__
+        elif hasattr(obj, '__name__'):
+            name = obj.__name__
+        else:
+            name = repr(obj)
+
+        return f'{mod_name}.{name}'
 
     def _match_targets(self, obj_name, *args, **kwargs):
         matches = []
@@ -193,19 +213,6 @@ class Patcher(LoggingMixin):
             return rv
 
         return wrapper
-
-    @staticmethod
-    def _get_full_obj_name(obj):
-        mod_name = obj.__module__ if hasattr(obj, '__module__') else ''
-
-        if hasattr(obj, '__qualname__'):
-            name = obj.__qualname__
-        elif hasattr(obj, '__name__'):
-            name = obj.__name__
-        else:
-            name = repr(obj)
-
-        return f'{mod_name}.{name}'
 
     def _dispatch_wrap(self, obj, name):
         was_wrapped = False
@@ -232,7 +239,7 @@ class Patcher(LoggingMixin):
         else:
             for attr_name in dir(obj):
                 attr_obj = getattr(obj, attr_name)
-                if callable(attr_obj) and not _is_dunder(attr_name):
+                if callable(attr_obj) and not self._is_dunder(attr_name):
                     attr_full_name = self._get_full_obj_name(attr_obj)
                     attr_obj, was_wrapped = self._dispatch_wrap(attr_obj, attr_full_name)
                     log_msg = f'patching method `{attr_name}` of `{obj_name}`.'
@@ -246,7 +253,7 @@ class Patcher(LoggingMixin):
 
     def patch_mod(self, mod):
         for attr_name, attr_val in vars(mod).items():
-            if not _is_dunder(attr_name):
+            if not self._is_dunder(attr_name):
                 setattr(mod, attr_name, self.patch_obj(attr_val))
 
         return mod
@@ -258,7 +265,6 @@ class Tracer(LoggingMixin):
     def __init__(self, tree, patcher):
         self.tree = tree
         self.patcher = patcher
-        self._spawn_logger()
 
     @property
     def matches(self):
