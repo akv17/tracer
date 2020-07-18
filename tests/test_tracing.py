@@ -9,18 +9,18 @@ class TestTracing(unittest.TestCase):
         self.mn = 'tests.test_proj.main'
         self.fcall = 'main(x=2)'
         self.targets = [2, -2, 4]
+        self.expected_imported = sorted([
+            'tests.test_proj.main',
+            'tests.test_proj.foo',
+            'tests.test_proj.bar',
+            'tests.test_proj.baz.baz',
+        ])
         self.expected_wrapped = sorted([
             'tests.test_proj.foo.foo',
             'tests.test_proj.foo.Foo.foo',
             'tests.test_proj.bar.bar',
             'tests.test_proj.baz.baz.buzz',
             'tests.test_proj.main.main'
-        ])
-        self.expected_imported = sorted([
-            'tests.test_proj.main',
-            'tests.test_proj.foo',
-            'tests.test_proj.bar',
-            'tests.test_proj.baz.baz',
         ])
         # in execution order.
         self.expected_matches = [
