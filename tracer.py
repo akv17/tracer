@@ -52,11 +52,12 @@ class LoggingMixin:
 
 class ProjectTree(LoggingMixin):
 
-    def __init__(self, project_root, entry_mod_name):
+    def __init__(self, project_root, top_package, entry_mod_name):
         self.project_root = project_root
+        self.top_package = top_package
         self.entry_mod_name = entry_mod_name
         self.entry_mod = None
-        self.top_package = entry_mod_name.split('.')[0]
+        self._imported = set()
         self._spawn_logger()
 
     def _parse_mod_imports(self, src, mod_name):
@@ -85,12 +86,17 @@ class ProjectTree(LoggingMixin):
             imps = self._parse_mod_imports(src, mod_name=mod_name)
         return imps
 
+    def _import_mod(self, mod_name):
+        mod = importlib.import_module(mod_name)
+        self._imported.add(mod_name)
+        self._logger.debug(f'visiting module `{mod_name}`.')
+        return mod
+
     def __iter__(self):
         imports = deque([self.entry_mod_name])
         while imports:
             mod_name = imports.popleft()
-            mod = importlib.import_module(mod_name)
-            self._logger.debug(f'visiting module `{mod_name}`.')
+            mod = self._import_mod(mod_name)
             yield mod
 
             mod_imports = self._get_imports(mod_name)
@@ -155,9 +161,10 @@ class GenericMatcher(BaseMatcher):
 
 class Patcher(LoggingMixin):
 
-    def __init__(self, matchers):
+    def __init__(self, top_package, matchers):
+        self.top_package = top_package
         self.matchers = matchers
-        self._already_wrapped = set()
+        self._wrapped = set()
         self._spawn_logger()
 
     @property
@@ -166,7 +173,7 @@ class Patcher(LoggingMixin):
 
     @property
     def num_patched(self):
-        return len(self._already_wrapped)
+        return len(self._wrapped)
 
     def _match_targets(self, obj_name, *args, **kwargs):
         matches = []
@@ -189,34 +196,39 @@ class Patcher(LoggingMixin):
 
     @staticmethod
     def _get_full_obj_name(obj):
+        mod_name = obj.__module__ if hasattr(obj, '__module__') else ''
+
         if hasattr(obj, '__qualname__'):
             name = obj.__qualname__
         elif hasattr(obj, '__name__'):
             name = obj.__name__
         else:
             name = repr(obj)
-        return f'{obj.__module__}.{name}'
+
+        return f'{mod_name}.{name}'
 
     def _dispatch_wrap(self, obj, name):
         was_wrapped = False
-        if name not in self._already_wrapped:
+        if name not in self._wrapped:
             obj = self._wrap(obj)
-            self._already_wrapped.add(name)
+            self._wrapped.add(name)
             was_wrapped = True
         return obj, was_wrapped
 
     def patch_obj(self, obj):
-        if not hasattr(obj, '__module__') or not obj.__module__.startswith('src'):
+        obj_name = self._get_full_obj_name(obj)
+        if not obj_name.startswith(self.top_package):
             return obj
 
-        obj_name = self._get_full_obj_name(obj)
         was_wrapped = False
         log_msg = ''
 
+        # wrap a function straight away.
         if isinstance(obj, FunctionType):
             obj, was_wrapped = self._dispatch_wrap(obj, obj_name)
             log_msg = f'patching function `{obj_name}`.'
 
+        # wrap any callable attr of an instance.
         else:
             for attr_name in dir(obj):
                 attr_obj = getattr(obj, attr_name)
@@ -277,14 +289,25 @@ class Tracer(LoggingMixin):
             json.dump(rv, f)
 
 
-def trace(mn, fcall, target, report_fp=None, debug=False):
+def trace(
+    mn,
+    fcall,
+    targets,
+    report_fp=None,
+    debug=False,
+    do_report=False
+):
     if debug:
         LoggingMixin.LEVEL = logging.DEBUG
 
     proj_root = Path(__file__).parent.parent.as_posix()
-    tree = ProjectTree(project_root=proj_root, entry_mod_name=mn)
-    patcher = Patcher(matchers=[GenericMatcher([target])])
+    top_package = mn.split('.')[0]
+    tree = ProjectTree(top_package=top_package, project_root=proj_root, entry_mod_name=mn)
+    patcher = Patcher(top_package=top_package, matchers=[GenericMatcher(targets)])
     tracer = Tracer(tree=tree, patcher=patcher)
     tracer.exec(fcall)
-    tracer.report(fp=report_fp)
-    return tracer.matches
+
+    if do_report:
+        tracer.report(fp=report_fp)
+
+    return tracer
