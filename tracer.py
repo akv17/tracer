@@ -40,14 +40,14 @@ class Match:
 
 
 class LoggingMixin:
-    _LOG_LEVEL = logging.DEBUG
+    LEVEL = logging.INFO
 
     def _spawn_logger(self):
         logging.basicConfig()
         cls = self.__class__
         name = f'{cls.__module__}.{cls.__name__}'
         self._logger = logging.getLogger(name)
-        self._logger.setLevel(self._LOG_LEVEL)
+        self._logger.setLevel(self.LEVEL)
 
 
 class ProjectTree(LoggingMixin):
@@ -276,7 +276,10 @@ class Tracer(LoggingMixin):
             json.dump(rv, f)
 
 
-def trace(mn, fcall, target, report_fp=None):
+def trace(mn, fcall, target, report_fp=None, debug=False):
+    if debug:
+        LoggingMixin.LEVEL = logging.DEBUG
+
     proj_root = Path(__file__).parent.parent.as_posix()
     tree = ProjectTree(project_root=proj_root, entry_mod_name=mn)
     patcher = Patcher(matchers=[GenericMatcher([target])])
