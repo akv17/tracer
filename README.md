@@ -17,7 +17,7 @@ def baz(val):
     val = bar(val)
     return val
 ```
-- this is an extremely useful tracing of all occurrences of integer value `2` when calling `foo.main(x=-2)`.
+- this is an extremely useful tracing of integer value `2` when calling `foo.baz(x=-2)`.
 ```
 >>> python cli.py -e "foo.baz(val=-2)" -t 2 --ttype int
 {
