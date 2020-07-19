@@ -17,21 +17,21 @@ class Match:
 
     def __init__(
         self,
-        obj_name=None,
-        args_spec=None,
-        arg_name=None,
         target=None,
+        func=None,
+        where=None,
+        arg_name=None,
         value=None,
         matcher_type=None,
     ):
-        self.obj_name = obj_name
-        self.args_spec = args_spec
-        self.arg_name = arg_name
         self.target = target
+        self.func = func
+        self.where = where
+        self.arg_name = arg_name
         self.value = value
-        self.matcher_type = matcher_type
+        self.type = type(self.value)
         self.timestamp = datetime.now()
-        self.arg_type = type(self.value)
+        self.matcher_type = matcher_type
         self.stack = None
 
     def __repr__(self):
@@ -121,20 +121,20 @@ class BaseMatcher(LoggingMixin):
         self.matches = []
 
     @abstractmethod
-    def _match_arg(self, arg_val, target):
+    def _match_arg(self, value, target):
         raise NotImplementedError
 
-    def _match_args_iter(self, obj_name, args_iter, args_spec):
+    def _match_val_iter(self, obj_name, val_iter, where):
         matches = []
-        for arg_name, arg_val in args_iter:
+        for val_name, val in val_iter:
             for t in self.targets:
-                if self._match_arg(arg_val=arg_val, target=t):
+                if self._match_arg(value=val, target=t):
                     match = Match(
-                        obj_name=obj_name,
-                        args_spec=args_spec,
-                        arg_name=arg_name,
+                        func=obj_name,
+                        where=where,
+                        arg_name=val_name,
                         target=t,
-                        value=arg_val,
+                        value=val,
                         matcher_type=type(self)
                     )
                     matches.append(match)
@@ -146,30 +146,35 @@ class BaseMatcher(LoggingMixin):
         return matches
 
     def _match_args(self, obj_name, *args):
-        return self._match_args_iter(obj_name, args_iter=enumerate(args), args_spec='args')
+        return self._match_val_iter(obj_name, val_iter=enumerate(args), where='args')
 
     def _match_kwargs(self, obj_name, **kwargs):
-        return self._match_args_iter(obj_name, args_iter=kwargs.items(), args_spec='kwargs')
+        return self._match_val_iter(obj_name, val_iter=kwargs.items(), where='kwargs')
 
-    def match(self, obj_name, *args, **kwargs):
+    def _match_retval(self, obj_name, rv):
+        return self._match_val_iter(obj_name, val_iter=zip([None], [rv]), where='return')
+
+    def match(self, obj_name, rv, *args, **kwargs):
         matches = []
         arg_matches = self._match_args(obj_name, *args)
         matches.extend(arg_matches)
         kwargs_matches = self._match_kwargs(obj_name, **kwargs)
         matches.extend(kwargs_matches)
+        rv_matches = self._match_retval(obj_name, rv)
+        matches.extend(rv_matches)
         return matches
 
 
 class EqualsMatcher(BaseMatcher):
 
-    def _match_arg(self, arg_val, target):
-        return arg_val == target
+    def _match_arg(self, value, target):
+        return value == target
 
 
 class ContainsMatcher(BaseMatcher):
 
-    def _match_arg(self, arg_val, target):
-        return target in arg_val if hasattr(arg_val, '__contains__') else False
+    def _match_arg(self, value, target):
+        return target in value if hasattr(value, '__contains__') else False
 
 
 class AttrEqualsMatcher(BaseMatcher):
@@ -178,8 +183,8 @@ class AttrEqualsMatcher(BaseMatcher):
         super().__init__(targets=targets)
         self.attr_name = attr_name
 
-    def _match_arg(self, arg_val, target):
-        return getattr(arg_val, self.attr_name) == target if hasattr(arg_val, self.attr_name) else False
+    def _match_arg(self, value, target):
+        return getattr(value, self.attr_name) == target if hasattr(value, self.attr_name) else False
 
 
 class Patcher(LoggingMixin):
@@ -225,12 +230,12 @@ class Patcher(LoggingMixin):
         for m in matches:
             m.stack = frames
 
-    def _match_targets(self, obj_name, *args, **kwargs):
-        matches = []
-        for matcher in self.matchers:
-            cur_matches = matcher.match(obj_name, *args, **kwargs)
-            matches.extend(cur_matches)
-        return matches
+    def _match_targets(self, obj_name, rv, *args, **kwargs):
+        return [
+            m
+            for matcher in self.matchers
+            for m in matcher.match(obj_name, rv, *args, **kwargs)
+        ]
 
     def _wrap(self, obj):
         obj_name = self._get_full_obj_name(obj)
@@ -244,7 +249,7 @@ class Patcher(LoggingMixin):
             kwargs_ = args_.arguments
             rv = obj(*args, **kwargs)
             kwargs_.pop('self', None)  # avoid binding self twice.
-            matches = self._match_targets(obj_name, **kwargs_)
+            matches = self._match_targets(obj_name, rv, **kwargs_)
             if self.track_stack:
                 self._set_stack(matches=matches)
             return rv
