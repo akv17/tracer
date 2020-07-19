@@ -1,5 +1,5 @@
 # Description
-a pure python tool for runtime tracing of a particular value as any function argument.
+a pure python tool for runtime tracing of a particular value as any function argument / return value.
 
 # Example
 - this is an extremely useful module `foo.py`. 
