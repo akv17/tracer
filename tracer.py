@@ -378,7 +378,7 @@ def trace(
     return tracer
 
 
-# ===== cli handlers ======
+# ===== cli handlers =====
 
 
 class ParsingError(Exception):
@@ -417,15 +417,13 @@ def cli_parse_target(val, cast_func='str'):
 def cli_main(args):
     mn, fcall = cli_parse_expr(args.e)
     target = cli_parse_target(val=args.t, cast_func=args.ttype)
-    debug = bool(args.d)
-    track_stack = bool(args.stack)
     return trace(
         mn=mn,
         fcall=fcall,
         targets=[target],
         report_fp=args.o,
-        debug=debug,
-        track_stack=track_stack
+        debug=bool(args.d),
+        track_stack=bool(args.stack)
     )
 
 
