@@ -265,7 +265,7 @@ class Patcher(LoggingMixin):
             was_wrapped = True
 
         if was_wrapped:
-            self._logger.debug(log_msg or f'wrapped object `{name}`.')
+            self._logger.debug(log_msg or f'patching object `{name}`.')
 
         return obj, was_wrapped
 
