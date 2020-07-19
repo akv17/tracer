@@ -28,7 +28,7 @@ def foo(val):
     val = buzz(val)
     return val
 ```
-- this is an extremely useful tracing of integer value `2` when calling `foo.buzz(val=-2)`.
+- this is an extremely useful tracing of integer value `2` when calling `foo.foo(val=-2)`.
 ```
 >>> python tracer.py -e "foo.foo(val=-2)" -t 2 --ttype int
 >>> cat traces.json
