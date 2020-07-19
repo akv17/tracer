@@ -122,14 +122,14 @@ class BaseMatcher(LoggingMixin):
         self.matches = []
 
     @abstractmethod
-    def _match_arg(self, value, target):
+    def _match_val(self, value, target):
         raise NotImplementedError
 
     def _match_val_iter(self, obj_name, val_iter, where):
         matches = []
         for val_name, val in val_iter:
             for t in self.targets:
-                if self._match_arg(value=val, target=t):
+                if self._match_val(value=val, target=t):
                     match = Match(
                         func=obj_name,
                         where=where,
@@ -168,13 +168,13 @@ class BaseMatcher(LoggingMixin):
 
 class EqualsMatcher(BaseMatcher):
 
-    def _match_arg(self, value, target):
+    def _match_val(self, value, target):
         return value == target
 
 
 class ContainsMatcher(BaseMatcher):
 
-    def _match_arg(self, value, target):
+    def _match_val(self, value, target):
         return target in value if hasattr(value, '__contains__') else False
 
 
@@ -184,7 +184,7 @@ class AttrEqualsMatcher(BaseMatcher):
         super().__init__(targets=targets)
         self.attr_name = attr_name
 
-    def _match_arg(self, value, target):
+    def _match_val(self, value, target):
         return getattr(value, self.attr_name) == target if hasattr(value, self.attr_name) else False
 
 
