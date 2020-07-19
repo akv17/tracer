@@ -11,4 +11,5 @@ def main(x):
     x = bar(x)
     x = foo(x)
     x = buzz(x)
+    x = foo_obj(x)
     return x

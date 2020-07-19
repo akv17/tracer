@@ -240,7 +240,7 @@ class Patcher(LoggingMixin):
 
     def _wrap(self, obj):
         obj_name = self._get_full_obj_name(obj)
-        sig = inspect.signature(obj)
+        sig = inspect.signature(obj.__call__) if inspect.isclass(obj) else inspect.signature(obj)
 
         @wraps(obj)
         def wrapper(*args, **kwargs):
@@ -257,12 +257,16 @@ class Patcher(LoggingMixin):
 
         return wrapper
 
-    def _dispatch_wrap(self, obj, name):
+    def _dispatch_wrap(self, obj, name, log_msg=None):
         was_wrapped = False
         if name not in self._wrapped:
             obj = self._wrap(obj)
             self._wrapped.add(name)
             was_wrapped = True
+
+        if was_wrapped:
+            self._logger.debug(log_msg or f'wrapped object `{name}`.')
+
         return obj, was_wrapped
 
     def patch_obj(self, obj):
@@ -270,27 +274,21 @@ class Patcher(LoggingMixin):
         if not obj_name.startswith(self.top_package):
             return obj
 
-        was_wrapped = False
-        log_msg = ''
-
         # wrap a function straight away.
         if isinstance(obj, FunctionType):
-            obj, was_wrapped = self._dispatch_wrap(obj, obj_name)
             log_msg = f'patching function `{obj_name}`.'
+            obj, was_wrapped = self._dispatch_wrap(obj, obj_name, log_msg=log_msg)
 
-        # wrap any callable attr of an instance.
+        # wrap any callable attr of a class including __call__ (the only dunder patched).
         else:
             for attr_name in dir(obj):
                 attr_obj = getattr(obj, attr_name)
-                if callable(attr_obj) and not self._is_dunder(attr_name):
+                if callable(attr_obj) and (attr_name == '__call__' or not self._is_dunder(attr_name)):
                     attr_full_name = self._get_full_obj_name(attr_obj)
-                    attr_obj, was_wrapped = self._dispatch_wrap(attr_obj, attr_full_name)
                     log_msg = f'patching method `{attr_name}` of `{obj_name}`.'
+                    attr_obj, was_wrapped = self._dispatch_wrap(attr_obj, attr_full_name, log_msg=log_msg)
                     if was_wrapped:
                         setattr(obj, attr_name, attr_obj)
-
-        if was_wrapped:
-            self._logger.debug(log_msg)
 
         return obj
 
