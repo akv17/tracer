@@ -13,7 +13,6 @@ from types import FunctionType
 
 
 class Match:
-    HIDDEN_FIELDS = ('args_spec',)
 
     def __init__(
         self,
@@ -35,7 +34,7 @@ class Match:
         self.stack = None
 
     def __repr__(self):
-        vars_ = ', '.join(f'{k}={v}' for k, v in vars(self).items() if k not in self.HIDDEN_FIELDS)
+        vars_ = ', '.join(f'{k}={v}' for k, v in vars(self).items())
         return f'{self.__class__.__name__}({vars_})'
 
 
@@ -341,7 +340,7 @@ class Tracer(LoggingMixin):
 
         for trg, trg_matches in trg_map.items():
             rv[trg] = [
-                {k: _serialize(v) for k, v in vars(m).items() if k not in Match.HIDDEN_FIELDS}
+                {k: _serialize(v) for k, v in vars(m).items()}
                 for m in trg_matches
             ]
 
