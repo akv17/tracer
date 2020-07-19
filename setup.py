@@ -5,7 +5,7 @@ from tracer import __version__
 setup(
     name='tracer',
     version=__version__,
-    description='runtime tracing of function arguments / return values',
+    description='runtime tracing of arguments / return values of callables',
     author='akv17',
     author_email='artem@nlogic.ai',
     url='https://github.com/akv17/tracer',
