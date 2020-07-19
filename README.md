@@ -26,36 +26,62 @@ def buzz(val):
 - this is an extremely useful tracing of integer value `2` when calling `foo.buzz(val=-2)`.
 ```
 >>> python tracer.py -e "foo.buzz(val=-2)" -t 2 --ttype int
+>>> cat traces.json
 {
   "2": [
     {
-      "obj_name": "foo.bar",
-      "arg_name": "val",
       "target": 2,
+      "func": "foo.foo",
+      "where": "return",
+      "arg_name": null,
       "value": 2,
+      "type": "<class 'int'>",
+      "timestamp": "2020-07-19 20:00:54.969932",
       "matcher_type": "<class '__main__.EqualsMatcher'>",
-      "timestamp": "2020-07-19 16:55:37.171571",
-      "arg_type": "<class 'int'>",
       "stack": null
     },
     {
-      "obj_name": "foo.bar",
+      "target": 2,
+      "func": "foo.bar",
+      "where": "kwargs",
+      "arg_name": "val",
+      "value": 2,
+      "type": "<class 'int'>",
+      "timestamp": "2020-07-19 20:00:54.970002",
+      "matcher_type": "<class '__main__.EqualsMatcher'>",
+      "stack": null
+    },
+    {
+      "target": 2,
+      "func": "foo.bar",
+      "where": "kwargs",
       "arg_name": "pw",
-      "target": 2,
       "value": 2,
+      "type": "<class 'int'>",
+      "timestamp": "2020-07-19 20:00:54.970006",
       "matcher_type": "<class '__main__.EqualsMatcher'>",
-      "timestamp": "2020-07-19 16:55:37.171578",
-      "arg_type": "<class 'int'>",
       "stack": null
     },
     {
-      "obj_name": "foo.foo",
-      "arg_name": "val",
       "target": 2,
+      "func": "foo.baz",
+      "where": "return",
+      "arg_name": null,
       "value": 2,
+      "type": "<class 'int'>",
+      "timestamp": "2020-07-19 20:00:54.970075",
       "matcher_type": "<class '__main__.EqualsMatcher'>",
-      "timestamp": "2020-07-19 16:55:37.171681",
-      "arg_type": "<class 'int'>",
+      "stack": null
+    },
+    {
+      "target": 2,
+      "func": "foo.foo",
+      "where": "kwargs",
+      "arg_name": "val",
+      "value": 2,
+      "type": "<class 'int'>",
+      "timestamp": "2020-07-19 20:00:54.970116",
+      "matcher_type": "<class '__main__.EqualsMatcher'>",
       "stack": null
     }
   ]
