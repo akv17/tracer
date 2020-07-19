@@ -26,12 +26,13 @@ class TestTracing(unittest.TestCase):
         self.expected_matches = [
             {'target': 2, 'obj_name': 'tests.test_proj.foo.Foo.foo'},
             {'target': -2, 'obj_name': 'tests.test_proj.bar.bar'},
+            {'target': 2, 'obj_name': 'tests.test_proj.bar.bar'},
             {'target': 4, 'obj_name': 'tests.test_proj.foo.foo'},
             {'target': 2, 'obj_name': 'tests.test_proj.main.main'},
         ]
 
     def test_tracing(self):
-        tracer = trace(mn=self.mn, fcall=self.fcall, targets=self.targets, do_report=False)
+        tracer = trace(mn=self.mn, fcall=self.fcall, targets=self.targets, do_report=False, debug=1)
 
         imported = sorted(tracer.tree._imported)
         self.assertEqual(imported, self.expected_imported)
@@ -40,7 +41,7 @@ class TestTracing(unittest.TestCase):
         self.assertEqual(wrapped, self.expected_wrapped)
 
         matches = tracer.matches
-        self.assertEqual(len(matches), 4)
+        self.assertEqual(len(matches), 5)
         for match, exp_match in zip(matches, self.expected_matches):
             for field in exp_match:
                 self.assertEqual(exp_match[field], getattr(match, field))
