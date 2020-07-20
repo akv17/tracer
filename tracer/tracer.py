@@ -82,12 +82,22 @@ class ModuleTree(LoggingMixin):
 
         return names
 
-    def _get_imports(self, mod_name):
+    def _get_mod_path(self, mod_name):
         mod_path = mod_name.replace('.', os.path.sep) + '.py'
+
+        if not os.path.exists(mod_path):
+            self._logger.debug(f'guessing __init__ of module `{mod_name}`.')
+            mod_path, _ = os.path.split(mod_path)
+            mod_path = os.path.join(mod_path, '__init__.py')
+
         if not os.path.exists(mod_path):
             msg = f'no module `{mod_name}` at inferred path `{mod_path}`.'
             raise Exception(msg)
 
+        return mod_path
+
+    def _get_imports(self, mod_name):
+        mod_path = self._get_mod_path(mod_name)
         with open(mod_path, 'r') as f:
             src = f.read()
             imps = self._parse_mod_imports(src, mod_name=mod_name)
@@ -278,7 +288,8 @@ class Patcher(LoggingMixin):
             obj, was_wrapped = self._dispatch_wrap(obj, obj_name, log_msg=log_msg)
 
         # wrap any callable attr of a class including __call__ (the only dunder patched).
-        else:
+        # never patch exception classes.
+        elif inspect.isclass(obj) and not issubclass(obj, Exception):
             for attr_name in dir(obj):
                 attr_obj = getattr(obj, attr_name)
                 if callable(attr_obj) and (attr_name == '__call__' or not self._is_dunder(attr_name)):
@@ -312,7 +323,7 @@ class Tracer(LoggingMixin):
     def _setup(self):
         for mod in self.tree:
             self.patcher.patch_mod(mod)
-        msg = f'setup tracer of package `{self.tree.top_package}` patching {self.patcher.num_patched} objects.'
+        msg = f'setup tracer of package `{self.tree.top_package}` with {self.patcher.num_patched} patched objects.'
         self._logger.debug(msg)
 
     def exec(self, fcall):
