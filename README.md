@@ -92,3 +92,6 @@ def foo(val):
   ]
 }
 ```
+# Limitations
+- cannot trace nested functions
+- currently cannot perform relative imports while patching modules
