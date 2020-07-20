@@ -11,8 +11,6 @@ from datetime import datetime
 from functools import wraps
 from types import FunctionType
 
-__version__ = '0.1.0'
-
 
 class Match:
 
