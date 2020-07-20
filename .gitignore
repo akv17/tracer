@@ -5,3 +5,4 @@ tmp*.py
 *.json
 dist
 *egg-info
+.python-version
