@@ -386,8 +386,7 @@ class ParsingError(Exception):
 
 
 def cli_parse_expr(expr):
-    expr = re.sub(r'\s+', '', expr)
-    expr_parts = expr.split('.')
+    expr_parts = [part.strip() for part in expr.split('.')]
 
     if len(expr_parts) < 2:
         msg = 'got no module or no function in entry expression.'
