@@ -1,14 +1,20 @@
 import unittest
 
-from tracer import trace
+from tracer.tracer import setup_tracer
 
 
 class TestTracing(unittest.TestCase):
 
     def setUp(self) -> None:
         self.mn = 'tests.test_proj.main'
-        self.fcall = 'main(x=2)'
+        self.entry_kwargs = {'x': 2}
         self.targets = [2, -2, 4, -7, -8]
+        self.tracer = setup_tracer(mn=self.mn, targets=self.targets)
+
+        # import patched entry.
+        from tests.test_proj.main import main
+        self.entry_func = main
+
         self.expected_imported = sorted([
             'tests.test_proj.main',
             'tests.test_proj.foo',
@@ -40,15 +46,15 @@ class TestTracing(unittest.TestCase):
         ]
 
     def test_tracing(self):
-        tracer = trace(mn=self.mn, fcall=self.fcall, targets=self.targets, do_report=False, debug=True)
+        self.entry_func(**self.entry_kwargs)
 
-        imported = sorted(tracer.tree._imported)
+        imported = sorted(self.tracer.tree._imported)
         self.assertEqual(imported, self.expected_imported)
 
-        wrapped = sorted(tracer.patcher._wrapped)
+        wrapped = sorted(self.tracer.patcher._wrapped)
         self.assertEqual(wrapped, self.expected_wrapped)
 
-        matches = tracer.matches
+        matches = self.tracer.matches
         self.assertEqual(len(self.expected_matches), len(matches))
         for match, exp_match in zip(matches, self.expected_matches):
             for field in exp_match:
