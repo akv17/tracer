@@ -320,14 +320,14 @@ class Tracer(LoggingMixin):
     def matches(self):
         return self.patcher.matches
 
-    def _setup(self):
+    def setup(self):
         for mod in self.tree:
             self.patcher.patch_mod(mod)
         msg = f'setup tracer of package `{self.tree.top_package}` with {self.patcher.num_patched} patched objects.'
         self._logger.debug(msg)
 
     def exec(self, fcall):
-        self._setup()
+        self.setup()
         co = f'from {self.tree.entry_mod_name} import *; {fcall}'
         exec(co)
 
@@ -358,13 +358,10 @@ class Tracer(LoggingMixin):
             json.dump(rv, f)
 
 
-def trace(
+def setup_tracer(
     mn,
-    fcall,
     targets,
-    report_fp=None,
     debug=False,
-    do_report=True,
     track_stack=False
 ):
     if debug:
@@ -379,12 +376,28 @@ def trace(
     ]
     patcher = Patcher(top_package=top_package, matchers=matchers, track_stack=track_stack)
     tracer = Tracer(tree=tree, patcher=patcher)
-    tracer.exec(fcall)
-
-    if do_report:
-        tracer.report(fp=report_fp)
-
+    tracer.setup()
     return tracer
+
+
+def trace(targets, debug=False, track_stack=False, do_report=True, report_fp=None):
+    def deco(func):
+        mn = func.__module__
+        tracer = setup_tracer(
+            mn=mn,
+            targets=targets,
+            debug=debug,
+            track_stack=track_stack
+        )
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            rv = func(*args, **kwargs)
+            if do_report:
+                tracer.report(fp=report_fp)
+            return rv
+        return wrapper
+    return deco
 
 
 # ===== cli handlers =====
@@ -425,14 +438,7 @@ def cli_parse_target(val, cast_func='str'):
 def cli_main(args):
     mn, fcall = cli_parse_expr(args.e)
     target = cli_parse_target(val=args.t, cast_func=args.ttype)
-    return trace(
-        mn=mn,
-        fcall=fcall,
-        targets=[target],
-        report_fp=args.o,
-        debug=bool(args.d),
-        track_stack=bool(args.stack)
-    )
+    return None
 
 
 if __name__ == '__main__':
@@ -444,4 +450,3 @@ if __name__ == '__main__':
     arg_parser.add_argument('--d', type=int, help='enable debug', default=0)
     arg_parser.add_argument('--stack', type=int, help='enable stack tracking', default=0)
     cli_args = arg_parser.parse_args()
-    cli_main(cli_args)
