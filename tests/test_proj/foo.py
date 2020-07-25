@@ -9,3 +9,7 @@ class Foo:
 
     def foo(self, x):
         return -x
+
+    @staticmethod
+    def bar(x):
+        return x

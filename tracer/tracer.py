@@ -195,6 +195,29 @@ class AttrEqualsMatcher(BaseMatcher):
         return getattr(value, self.attr_name) == target if hasattr(value, self.attr_name) else False
 
 
+class Signature:
+
+    def __init__(self, obj, name=None, is_staticmeth=False):
+        self.obj = obj
+        self.name = name
+        self.is_staticmeth = is_staticmeth
+        self._sig = inspect.signature(obj)
+
+    def bind(self, *args, **kwargs):
+        if args and self.is_staticmeth:
+            args = args[1:]  # exclude bound instance.
+
+        try:
+            args_ = self._sig.bind(*args, **kwargs)
+            args_.apply_defaults()
+        except Exception as e:
+            msg = f'exception when binding signature of `{self.name}`: `{e}`'
+            raise Exception(msg)
+
+        kwargs_ = args_.arguments
+        return kwargs_
+
+
 class Patcher(LoggingMixin):
 
     def __init__(self, top_package, matchers, track_stack=False):
@@ -232,7 +255,11 @@ class Patcher(LoggingMixin):
     def _set_stack(matches):
         stack = inspect.stack()
         frames = [
-            {'filename': f.filename, 'lineno': f.lineno, 'function': f.frame.f_locals.get('obj_name', f.function)}
+            {
+                'filename': f.filename,
+                'lineno': f.lineno,
+                'function': f.frame.f_locals.get('obj_name', f.function)
+             }
             for f in stack[1:]
         ]
         for m in matches:
@@ -245,29 +272,27 @@ class Patcher(LoggingMixin):
             for m in matcher.match(obj_name, rv, *args, **kwargs)
         ]
 
-    def _wrap(self, obj):
-        obj_name = self._get_full_obj_name(obj)
-        sig = inspect.signature(obj.__call__) if inspect.isclass(obj) else inspect.signature(obj)
+    def _wrap(self, obj, name=None, is_staticmeth=False):
+        obj_name = name
+        sig = Signature(obj=obj, name=name, is_staticmeth=is_staticmeth)
 
         @wraps(obj)
         def wrapper(*args, **kwargs):
             self._logger.debug(f'tracing `{obj_name}`.')
-            args_ = sig.bind(*args, **kwargs)
-            args_.apply_defaults()
-            kwargs_ = args_.arguments
-            rv = obj(*args, **kwargs)
-            kwargs_.pop('self', None)  # avoid binding self twice.
-            matches = self._match_targets(obj_name, rv, **kwargs_)
+            kwargs = sig.bind(*args, **kwargs)
+            rv = obj(**kwargs.copy())
+            kwargs.pop('self', None)  # avoid matching against bound instances.
+            matches = self._match_targets(obj_name, rv, **kwargs)
             if self.track_stack:
                 self._set_stack(matches=matches)
             return rv
 
         return wrapper
 
-    def _dispatch_wrap(self, obj, name, log_msg=None):
+    def _dispatch_wrap(self, obj, name, is_staticmeth=False, log_msg=None):
         was_wrapped = False
         if name not in self._wrapped:
-            obj = self._wrap(obj)
+            obj = self._wrap(obj, name=name, is_staticmeth=is_staticmeth)
             self._wrapped.add(name)
             was_wrapped = True
 
@@ -291,10 +316,18 @@ class Patcher(LoggingMixin):
         elif inspect.isclass(obj) and not issubclass(obj, Exception):
             for attr_name in dir(obj):
                 attr_obj = getattr(obj, attr_name)
+
                 if callable(attr_obj) and (attr_name == '__call__' or not self._is_dunder(attr_name)):
                     attr_full_name = self._get_full_obj_name(attr_obj)
+                    is_staticmeth = 'self' not in inspect.signature(attr_obj).parameters
                     log_msg = f'patching method `{attr_name}` of `{obj_name}`.'
-                    attr_obj, was_wrapped = self._dispatch_wrap(attr_obj, attr_full_name, log_msg=log_msg)
+                    attr_obj, was_wrapped = self._dispatch_wrap(
+                        attr_obj,
+                        attr_full_name,
+                        is_staticmeth=is_staticmeth,
+                        log_msg=log_msg
+                    )
+
                     if was_wrapped:
                         setattr(obj, attr_name, attr_obj)
 

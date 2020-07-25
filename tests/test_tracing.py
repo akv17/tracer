@@ -18,6 +18,7 @@ class TestTracing(unittest.TestCase):
             'tests.test_proj.foo.foo',
             'tests.test_proj.foo.Foo.__call__',
             'tests.test_proj.foo.Foo.foo',
+            'tests.test_proj.foo.Foo.bar',
             'tests.test_proj.bar.bar',
             'tests.test_proj.baz.baz.buzz',
             'tests.test_proj.main.main'

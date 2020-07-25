@@ -12,4 +12,6 @@ def main(x):
     x = foo(x)
     x = buzz(x)
     x = foo_obj(x)
+    # just to test correct binding of staticmethods's sigs.
+    foo_obj.bar(0x0)
     return x
