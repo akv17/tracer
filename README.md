@@ -28,9 +28,20 @@ def foo(val):
     val = buzz(val)
     return val
 ```
-- this is an extremely useful tracing of integer value `2` when calling `foo.foo(val=-2)`.
+- run an extremely useful tracing of int `2` when executing `foo.foo(val=-2)`.
 ```
->>> python tracer.py -e "foo.foo(val=-2)" -t 2 --ttype int
+from tracer import trace, EqualsMatcher
+from foo import foo
+
+trace(
+    foo,
+    args=(),
+    kwargs={'val': -2},
+    matchers=[EqualsMatcher(targets=[2])],
+)
+```
+- finally, grab those extremely useful traces. 
+```
 >>> cat traces.json
 {
   "2": [
@@ -38,60 +49,59 @@ def foo(val):
       "target": 2,
       "func": "foo.buzz",
       "where": "return",
-      "arg_name": null,
+      "identifier": null,
       "value": 2,
       "type": "<class 'int'>",
-      "timestamp": "2020-07-19 22:13:38.995245",
-      "matcher_type": "<class '__main__.EqualsMatcher'>",
+      "timestamp": "2020-07-26 00:05:26.481093",
+      "matcher_type": "<class 'tracer.tracer.EqualsMatcher'>",
       "stack": null
     },
     {
       "target": 2,
       "func": "foo.bar",
       "where": "kwargs",
-      "arg_name": "val",
+      "identifier": "val",
       "value": 2,
       "type": "<class 'int'>",
-      "timestamp": "2020-07-19 22:13:38.995307",
-      "matcher_type": "<class '__main__.EqualsMatcher'>",
+      "timestamp": "2020-07-26 00:05:26.481154",
+      "matcher_type": "<class 'tracer.tracer.EqualsMatcher'>",
       "stack": null
     },
     {
       "target": 2,
       "func": "foo.bar",
       "where": "kwargs",
-      "arg_name": "pw",
+      "identifier": "pw",
       "value": 2,
       "type": "<class 'int'>",
-      "timestamp": "2020-07-19 22:13:38.995310",
-      "matcher_type": "<class '__main__.EqualsMatcher'>",
+      "timestamp": "2020-07-26 00:05:26.481157",
+      "matcher_type": "<class 'tracer.tracer.EqualsMatcher'>",
       "stack": null
     },
     {
       "target": 2,
       "func": "foo.Baz.__call__",
       "where": "return",
-      "arg_name": null,
+      "identifier": null,
       "value": 2,
       "type": "<class 'int'>",
-      "timestamp": "2020-07-19 22:13:38.995373",
-      "matcher_type": "<class '__main__.EqualsMatcher'>",
+      "timestamp": "2020-07-26 00:05:26.481245",
+      "matcher_type": "<class 'tracer.tracer.EqualsMatcher'>",
       "stack": null
     },
     {
       "target": 2,
       "func": "foo.buzz",
       "where": "kwargs",
-      "arg_name": "val",
+      "identifier": "val",
       "value": 2,
       "type": "<class 'int'>",
-      "timestamp": "2020-07-19 22:13:38.995408",
-      "matcher_type": "<class '__main__.EqualsMatcher'>",
+      "timestamp": "2020-07-26 00:05:26.481288",
+      "matcher_type": "<class 'tracer.tracer.EqualsMatcher'>",
       "stack": null
     }
   ]
 }
 ```
 # Limitations
-- cannot trace nested functions
-- currently cannot perform relative imports while patching modules
+- no tracing of nested functions
