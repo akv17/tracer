@@ -150,16 +150,20 @@ class BaseMatcher(LoggingMixin):
         matches = []
         for val_ident, val in val_iter:
             for t in self.targets:
-                if self._match_val(value=val, target=t):
-                    match = Match(
-                        func=obj_name,
-                        where=where,
-                        identifier=val_ident,
-                        target=t,
-                        value=val,
-                        matcher_type=type(self)
-                    )
-                    matches.append(match)
+                try:
+                    if self._match_val(value=val, target=t):
+                        match = Match(
+                            func=obj_name,
+                            where=where,
+                            identifier=val_ident,
+                            target=t,
+                            value=val,
+                            matcher_type=type(self)
+                        )
+                        matches.append(match)
+                except Exception as e:
+                    self._logger.warning(f'exception when matching via `{self}`: `{e}`; ignoring.')
+                    continue
 
         for m in matches:
             self._logger.debug(f'matched `{m}`.')
