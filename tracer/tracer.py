@@ -196,24 +196,24 @@ class AttrEqualsMatcher(BaseMatcher):
 
 class Signature:
 
-    def __init__(self, obj, name=None, is_staticmeth=False):
+    def __init__(self, obj, name=None, is_staticmethod=False):
         self.obj = obj
         self.name = name
-        self.is_staticmeth = is_staticmeth
+        self.is_staticmethod = is_staticmethod
         self._sig = inspect.signature(obj)
 
     def bind(self, *args, **kwargs):
-        if args and self.is_staticmeth:
+        if args and self.is_staticmethod:
             args = args[1:]  # exclude bound instance.
 
         try:
-            args_ = self._sig.bind(*args, **kwargs)
-            args_.apply_defaults()
+            kwargs_ = self._sig.bind(*args, **kwargs)
+            kwargs_.apply_defaults()
         except Exception as e:
             msg = f'exception when binding signature of `{self.name}`: `{e}`'
             raise Exception(msg)
 
-        kwargs_ = args_.arguments
+        kwargs_ = kwargs_.arguments
         return kwargs_
 
 
@@ -271,9 +271,9 @@ class Patcher(LoggingMixin):
             for m in matcher.match(obj_name, rv, *args, **kwargs)
         ]
 
-    def _wrap(self, obj, name=None, is_staticmeth=False):
+    def _wrap(self, obj, name=None, is_staticmethod=False):
         obj_name = name
-        sig = Signature(obj=obj, name=name, is_staticmeth=is_staticmeth)
+        sig = Signature(obj=obj, name=name, is_staticmethod=is_staticmethod)
 
         @wraps(obj)
         def wrapper(*args, **kwargs):
@@ -288,10 +288,10 @@ class Patcher(LoggingMixin):
 
         return wrapper
 
-    def _dispatch_wrap(self, obj, name, is_staticmeth=False, log_msg=None):
+    def _dispatch_wrap(self, obj, name, is_staticmethod=False, log_msg=None):
         was_wrapped = False
         if name not in self._wrapped:
-            obj = self._wrap(obj, name=name, is_staticmeth=is_staticmeth)
+            obj = self._wrap(obj, name=name, is_staticmethod=is_staticmethod)
             self._wrapped.add(name)
             was_wrapped = True
 
@@ -305,12 +305,12 @@ class Patcher(LoggingMixin):
         if not obj_name.startswith(self.top_package):
             return obj
 
-        # wrap a function straight away.
+        # patch a function straight away.
         if isinstance(obj, FunctionType):
             log_msg = f'patching function `{obj_name}`.'
             obj, was_wrapped = self._dispatch_wrap(obj, obj_name, log_msg=log_msg)
 
-        # wrap any callable attr of a class including __call__ (the only dunder patched).
+        # patch any callable attr of a class including __call__ (the only dunder patched).
         # never patch exception classes.
         elif inspect.isclass(obj) and not issubclass(obj, Exception):
             for attr_name in dir(obj):
@@ -318,12 +318,12 @@ class Patcher(LoggingMixin):
 
                 if callable(attr_obj) and (attr_name == '__call__' or not self._is_dunder(attr_name)):
                     attr_full_name = self._get_full_obj_name(attr_obj)
-                    is_staticmeth = 'self' not in inspect.signature(attr_obj).parameters
+                    is_staticmethod = 'self' not in inspect.signature(attr_obj).parameters
                     log_msg = f'patching method `{attr_name}` of `{obj_name}`.'
                     attr_obj, was_wrapped = self._dispatch_wrap(
                         attr_obj,
                         attr_full_name,
-                        is_staticmeth=is_staticmeth,
+                        is_staticmethod=is_staticmethod,
                         log_msg=log_msg
                     )
 
