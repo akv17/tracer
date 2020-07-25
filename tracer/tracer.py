@@ -414,7 +414,7 @@ class Tracer(LoggingMixin):
     def setup(self):
         for mod in self.tree:
             self.patcher.patch_mod(mod)
-        msg = f'setup tracer of package `{self.tree.top_package}` with {self.patcher.num_patched} patched objects.'
+        msg = f'setup tracer of packages `{list(self.tree.known_packages)}` with {self.patcher.num_patched} patched objects.'
         self._logger.debug(msg)
 
     def exec(self, fcall):
