@@ -18,14 +18,14 @@ class Match:
         target=None,
         func=None,
         where=None,
-        arg_name=None,
+        identifier=None,
         value=None,
         matcher_type=None,
     ):
         self.target = target
         self.func = func
         self.where = where
-        self.arg_name = arg_name
+        self.identifier = identifier
         self.value = value
         self.type = type(self.value)
         self.timestamp = datetime.now()
@@ -134,13 +134,13 @@ class BaseMatcher(LoggingMixin):
 
     def _match_val_iter(self, obj_name, val_iter, where):
         matches = []
-        for val_name, val in val_iter:
+        for val_ident, val in val_iter:
             for t in self.targets:
                 if self._match_val(value=val, target=t):
                     match = Match(
                         func=obj_name,
                         where=where,
-                        arg_name=val_name,
+                        identifier=val_ident,
                         target=t,
                         value=val,
                         matcher_type=type(self)
