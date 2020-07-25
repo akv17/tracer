@@ -1,6 +1,6 @@
 import unittest
 
-from tracer import trace
+from tracer import trace, EqualsMatcher
 from tests.test_proj.main import main
 
 
@@ -43,7 +43,7 @@ class TestTracing(unittest.TestCase):
             func=main,
             args=(2,),
             kwargs={},
-            targets=self.targets,
+            matchers=[EqualsMatcher(self.targets)],
             do_report=False,
             debug=True
         )

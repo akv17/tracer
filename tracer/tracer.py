@@ -180,7 +180,8 @@ class BaseMatcher(LoggingMixin):
         for val_ident, val in val_iter:
             for t in self.targets:
                 try:
-                    if self._match_val(value=val, target=t):
+                    flag, val = self._match_val(value=val, target=t)
+                    if flag:
                         match = Match(
                             func=obj_name,
                             where=where,
@@ -224,13 +225,14 @@ class BaseMatcher(LoggingMixin):
 class EqualsMatcher(BaseMatcher):
 
     def _match_val(self, value, target):
-        return value == target
+        return value == target, value
 
 
 class ContainsMatcher(BaseMatcher):
 
     def _match_val(self, value, target):
-        return target in value if hasattr(value, '__contains__') else False
+        flag = target in value if hasattr(value, '__contains__') else False
+        return flag, value
 
 
 class AttrEqualsMatcher(BaseMatcher):
@@ -240,7 +242,8 @@ class AttrEqualsMatcher(BaseMatcher):
         self.attr_name = attr_name
 
     def _match_val(self, value, target):
-        return getattr(value, self.attr_name) == target if hasattr(value, self.attr_name) else False
+        flag = getattr(value, self.attr_name) == target if hasattr(value, self.attr_name) else False
+        return flag, value
 
 
 class Signature:
@@ -453,9 +456,8 @@ def trace(
     func,
     args,
     kwargs,
-    targets,
+    matchers,
     known_packages=None,
-    matchers=None,
     debug=False,
     track_stack=False,
     do_report=True,
@@ -475,8 +477,6 @@ def trace(
         entry_mod_name=mn,
         known_packages=known_packages
     )
-    matchers = matchers or []
-    matchers = [*matchers, EqualsMatcher(targets)]
     patcher = Patcher(
         top_package=top_package,
         matchers=matchers,
@@ -493,3 +493,4 @@ def trace(
         tracer.report(fp=report_fp)
 
     return tracer
+
