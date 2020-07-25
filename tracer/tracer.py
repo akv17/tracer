@@ -7,19 +7,19 @@ from abc import abstractmethod
 from collections import deque
 from datetime import datetime
 from functools import wraps
-from types import FunctionType
+from types import FunctionType, MethodType
 
 
 class Match:
 
     def __init__(
-        self,
-        target=None,
-        func=None,
-        where=None,
-        identifier=None,
-        value=None,
-        matcher_type=None,
+            self,
+            target=None,
+            func=None,
+            where=None,
+            identifier=None,
+            value=None,
+            matcher_type=None,
     ):
         self.target = target
         self.func = func
@@ -222,8 +222,13 @@ class Signature:
         self._sig = inspect.signature(obj)
 
     def bind(self, *args, **kwargs):
-        if args and self.is_staticmethod:
-            args = args[1:]  # exclude bound instance.
+        # staticmethods called on instance hold self
+        # as the first arg which actually needs to be popped.
+        if self.is_staticmethod:
+            try:
+                self._sig.bind(*args, **kwargs)
+            except TypeError:
+                args = args[1:]
 
         try:
             kwargs_ = self._sig.bind(*args, **kwargs)
@@ -277,11 +282,16 @@ class Patcher(LoggingMixin, KnownPackagesMixin):
                 'filename': f.filename,
                 'lineno': f.lineno,
                 'function': f.frame.f_locals.get('obj_name', f.function)
-             }
+            }
             for f in stack[1:]
         ]
         for m in matches:
             m.stack = frames
+
+    @staticmethod
+    def _is_staticmethod(obj):
+        prms = inspect.signature(obj).parameters
+        return 'self' not in prms and not isinstance(obj, MethodType)
 
     def _match_targets(self, obj_name, rv, *args, **kwargs):
         return [
@@ -337,7 +347,7 @@ class Patcher(LoggingMixin, KnownPackagesMixin):
 
                 if callable(attr_obj) and (attr_name == '__call__' or not self._is_dunder(attr_name)):
                     attr_full_name = self._get_full_obj_name(attr_obj)
-                    is_staticmethod = 'self' not in inspect.signature(attr_obj).parameters
+                    is_staticmethod = self._is_staticmethod(attr_obj)
                     log_msg = f'patching method `{attr_name}` of `{obj_name}`.'
                     attr_obj, was_wrapped = self._dispatch_wrap(
                         attr_obj,
@@ -431,12 +441,7 @@ def trace(
         known_packages=known_packages
     )
     matchers = matchers or []
-    matchers = [
-        *matchers,
-        EqualsMatcher(targets),
-        ContainsMatcher(targets),
-        AttrEqualsMatcher(attr_name='value', targets=targets),
-    ]
+    matchers = [*matchers, EqualsMatcher(targets)]
     patcher = Patcher(
         top_package=top_package,
         matchers=matchers,
