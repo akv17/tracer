@@ -1,13 +1,12 @@
 import unittest
 
 from tracer import trace
+from tests.test_proj.main import main
 
 
 class TestTracing(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.mn = 'tests.test_proj.main'
-        self.fcall = 'main(x=2)'
         self.targets = [2, -2, 4, -7, -8]
         self.expected_imported = sorted([
             'tests.test_proj.main',
@@ -36,11 +35,17 @@ class TestTracing(unittest.TestCase):
             {'target': -7, 'func': 'tests.test_proj.foo.Foo.__call__', 'where': 'return'},
             {'target': 2, 'func': 'tests.test_proj.main.main', 'where': 'kwargs'},
             {'target': -7, 'func': 'tests.test_proj.main.main', 'where': 'return'},
-
         ]
 
     def test_tracing(self):
-        tracer = trace(mn=self.mn, fcall=self.fcall, targets=self.targets, do_report=False, debug=True)
+        tracer = trace(
+            func=main,
+            args=(2,),
+            kwargs={},
+            targets=self.targets,
+            do_report=False,
+            debug=True
+        )
 
         imported = sorted(tracer.tree._imported)
         self.assertEqual(imported, self.expected_imported)

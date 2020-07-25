@@ -4,7 +4,6 @@ import inspect
 import json
 import logging
 import os
-import re
 from abc import abstractmethod
 from collections import deque
 from datetime import datetime
@@ -320,14 +319,14 @@ class Tracer(LoggingMixin):
     def matches(self):
         return self.patcher.matches
 
-    def _setup(self):
+    def setup(self):
         for mod in self.tree:
             self.patcher.patch_mod(mod)
         msg = f'setup tracer of package `{self.tree.top_package}` with {self.patcher.num_patched} patched objects.'
         self._logger.debug(msg)
 
     def exec(self, fcall):
-        self._setup()
+        self.setup()
         co = f'from {self.tree.entry_mod_name} import *; {fcall}'
         exec(co)
 
@@ -359,89 +358,37 @@ class Tracer(LoggingMixin):
 
 
 def trace(
-    mn,
-    fcall,
+    func,
+    args,
+    kwargs,
     targets,
-    report_fp=None,
+    matchers=None,
     debug=False,
+    track_stack=False,
     do_report=True,
-    track_stack=False
+    report_fp=None
 ):
     if debug:
         LoggingMixin.LEVEL = logging.DEBUG
 
+    mn = func.__module__
     top_package = mn.split('.')[0]
     tree = ModuleTree(top_package=top_package, entry_mod_name=mn)
+    matchers = matchers or []
     matchers = [
+        *matchers,
         EqualsMatcher(targets),
         ContainsMatcher(targets),
-        AttrEqualsMatcher(attr_name='value', targets=targets)
+        AttrEqualsMatcher(attr_name='value', targets=targets),
     ]
     patcher = Patcher(top_package=top_package, matchers=matchers, track_stack=track_stack)
     tracer = Tracer(tree=tree, patcher=patcher)
-    tracer.exec(fcall)
+    tracer.setup()
+
+    func = getattr(tree.entry_mod, func.__name__)
+    func(*args, **kwargs)
 
     if do_report:
         tracer.report(fp=report_fp)
 
     return tracer
-
-
-# ===== cli handlers =====
-
-
-class ParsingError(Exception):
-    pass
-
-
-def cli_parse_expr(expr):
-    expr_parts = [part.strip() for part in expr.split('.')]
-
-    if len(expr_parts) < 2:
-        msg = 'got no module or no function in entry expression.'
-        raise ParsingError(msg)
-
-    mn = '.'.join(expr_parts[:-1])
-    fcall = expr_parts[-1]
-
-    if re.search(r'\(.*?\)', fcall) is None:
-        msg = 'got no function call in entry expression.'
-        raise ParsingError(msg)
-
-    return mn, fcall
-
-
-def cli_parse_target(val, cast_func='str'):
-    expr = f'{cast_func}({val})'
-    try:
-        val = eval(expr)
-    except Exception as e:
-        msg = f'while casting target as `{expr}` got exception `{e}`.'
-        raise ParsingError(msg)
-
-    return val
-
-
-def cli_main(args):
-    mn, fcall = cli_parse_expr(args.e)
-    target = cli_parse_target(val=args.t, cast_func=args.ttype)
-    return trace(
-        mn=mn,
-        fcall=fcall,
-        targets=[target],
-        report_fp=args.o,
-        debug=bool(args.d),
-        track_stack=bool(args.stack)
-    )
-
-
-if __name__ == '__main__':
-    arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument('-e', type=str, help='entry function call expression.', required=True)
-    arg_parser.add_argument('-t', type=str, help='target to trace.', required=True)
-    arg_parser.add_argument('--o', type=str, help='report json file path.', default=None)
-    arg_parser.add_argument('--ttype', type=str, help='target type cast function (default `str`).', default='str')
-    arg_parser.add_argument('--d', type=int, help='enable debug', default=0)
-    arg_parser.add_argument('--stack', type=int, help='enable stack tracking', default=0)
-    cli_args = arg_parser.parse_args()
-    cli_main(cli_args)
