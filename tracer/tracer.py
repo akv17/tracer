@@ -100,7 +100,7 @@ class ModuleTree(LoggingMixin, KnownPackagesMixin):
 
         if not os.path.exists(mod_path):
             self._logger.debug(f'guessing __init__ of module `{mod_name}`.')
-            mod_path, _ = os.path.split(mod_path)
+            mod_path, _ = os.path.splitext(mod_path)
             mod_path = os.path.join(mod_path, '__init__.py')
 
         if not os.path.exists(mod_path):
