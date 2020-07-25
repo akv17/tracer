@@ -13,13 +13,13 @@ from types import FunctionType, MethodType
 class Match:
 
     def __init__(
-            self,
-            target=None,
-            func=None,
-            where=None,
-            identifier=None,
-            value=None,
-            matcher_type=None,
+        self,
+        target=None,
+        func=None,
+        where=None,
+        identifier=None,
+        value=None,
+        matcher_type=None,
     ):
         self.target = target
         self.func = func
@@ -80,15 +80,33 @@ class ModuleTree(LoggingMixin, KnownPackagesMixin):
         self.entry_mod = None
         self._imported = set()
 
-    def _parse_mod_imports(self, src, mod_name):
+    def _resolve_relative_import(self, from_name, what_name, is_init_mod=False):
+        if what_name.count('.') > 1:
+            msg = f'got mutli-level relative import `{what_name}` in module `{from_name}`, ignoring.'
+            self._logger.warning(msg)
+            return ''
+
+        if not is_init_mod:
+            from_name = '.'.join(from_name.split('.')[:-1])
+
+        resolved_name = f'{from_name}.{what_name.lstrip(".")}'
+        msg = f'resolving relative import `{what_name}` in module `{from_name}` as `{resolved_name}`.'
+        self._logger.warning(msg)
+        return resolved_name
+
+    def _parse_mod_imports(self, src, mod_name, is_init_mod=False):
         names = []
         for ln in src.split('\n'):
             ln = ln.strip()
+
             if ln.startswith('import') or ln.startswith('from'):
                 name = ln.split()[1]
                 if name.startswith('.'):
-                    self._logger.warning(f'got relative import `{ln}` in module `{mod_name}`, ignoring.')
-                    continue
+                    name = self._resolve_relative_import(
+                        from_name=mod_name,
+                        what_name=name,
+                        is_init_mod=is_init_mod
+                    )
 
                 if self._is_from_known_package(name):
                     names.append(name)
@@ -111,12 +129,17 @@ class ModuleTree(LoggingMixin, KnownPackagesMixin):
 
     def _get_imports(self, mod_name):
         mod_path = self._get_mod_path(mod_name)
+        is_init_mod = mod_path.endswith('__init__.py')
+
         with open(mod_path, 'r') as f:
             src = f.read()
-            imps = self._parse_mod_imports(src, mod_name=mod_name)
+            imps = self._parse_mod_imports(src, mod_name=mod_name, is_init_mod=is_init_mod)
         return imps
 
     def _import_mod(self, mod_name):
+        if mod_name in self._imported:
+            return None
+
         mod = importlib.import_module(mod_name)
         self._imported.add(mod_name)
         self._logger.debug(f'imported module `{mod_name}`.')
@@ -127,6 +150,10 @@ class ModuleTree(LoggingMixin, KnownPackagesMixin):
         while imports:
             mod_name = imports.popleft()
             mod = self._import_mod(mod_name)
+
+            if mod is None:
+                continue
+
             yield mod
 
             mod_imports = self._get_imports(mod_name)
