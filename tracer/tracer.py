@@ -57,10 +57,25 @@ class LoggingMixin:
         return self.__logger
 
 
-class ModuleTree(LoggingMixin):
+class KnownPackagesMixin:
 
-    def __init__(self, top_package, entry_mod_name):
+    def __init__(self, top_package, known_packages=None):
         self.top_package = top_package
+        self.known_packages = known_packages or set()
+        self.known_packages = set(self.known_packages)
+        self.known_packages.add(self.top_package)
+
+    def _is_known_package(self, name):
+        return name in self.known_packages
+
+    def _is_from_known_package(self, name):
+        return any(name.startswith(pkg) for pkg in self.known_packages)
+
+
+class ModuleTree(LoggingMixin, KnownPackagesMixin):
+
+    def __init__(self, top_package, entry_mod_name, known_packages=None):
+        super().__init__(top_package=top_package, known_packages=known_packages)
         self.entry_mod_name = entry_mod_name
         self.entry_mod = None
         self._imported = set()
@@ -75,7 +90,7 @@ class ModuleTree(LoggingMixin):
                     self._logger.warning(f'got relative import `{ln}` in module `{mod_name}`, ignoring.')
                     continue
 
-                if name.startswith(self.top_package):
+                if self._is_from_known_package(name):
                     names.append(name)
 
         return names
@@ -217,10 +232,10 @@ class Signature:
         return kwargs_
 
 
-class Patcher(LoggingMixin):
+class Patcher(LoggingMixin, KnownPackagesMixin):
 
-    def __init__(self, top_package, matchers, track_stack=False):
-        self.top_package = top_package
+    def __init__(self, top_package, matchers, known_packages=None, track_stack=False):
+        super().__init__(top_package=top_package, known_packages=known_packages)
         self.matchers = matchers
         self.track_stack = track_stack
         self._wrapped = set()
@@ -302,7 +317,7 @@ class Patcher(LoggingMixin):
 
     def patch_obj(self, obj):
         obj_name = self._get_full_obj_name(obj)
-        if not obj_name.startswith(self.top_package):
+        if not self._is_from_known_package(obj_name):
             return obj
 
         # patch a function straight away.
@@ -394,18 +409,23 @@ def trace(
     args,
     kwargs,
     targets,
+    known_packages=None,
     matchers=None,
     debug=False,
     track_stack=False,
     do_report=True,
-    report_fp=None
+    report_fp=None,
 ):
     if debug:
         LoggingMixin.LEVEL = logging.DEBUG
 
     mn = func.__module__
     top_package = mn.split('.')[0]
-    tree = ModuleTree(top_package=top_package, entry_mod_name=mn)
+    tree = ModuleTree(
+        top_package=top_package,
+        entry_mod_name=mn,
+        known_packages=known_packages
+    )
     matchers = matchers or []
     matchers = [
         *matchers,
@@ -413,7 +433,12 @@ def trace(
         ContainsMatcher(targets),
         AttrEqualsMatcher(attr_name='value', targets=targets),
     ]
-    patcher = Patcher(top_package=top_package, matchers=matchers, track_stack=track_stack)
+    patcher = Patcher(
+        top_package=top_package,
+        matchers=matchers,
+        track_stack=track_stack,
+        known_packages=known_packages
+    )
     tracer = Tracer(tree=tree, patcher=patcher)
     tracer.setup()
 
