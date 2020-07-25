@@ -41,6 +41,8 @@ class LoggingMixin:
     FORMATTER = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
     STREAM_HANDLER = logging.StreamHandler()
     STREAM_HANDLER.setFormatter(FORMATTER)
+    LOG_CALLS = False
+    LOG_MATCHING_EXC = False
 
     @property
     def _logger(self):
@@ -189,7 +191,8 @@ class BaseMatcher(LoggingMixin):
                         )
                         matches.append(match)
                 except Exception as e:
-                    self._logger.warning(f'exception when matching via `{self}`: `{e}`; ignoring.')
+                    if self.LOG_MATCHING_EXC:
+                        self._logger.warning(f'exception when matching via `{self}`: `{e}`; ignoring.')
                     continue
 
         for m in matches:
@@ -333,7 +336,8 @@ class Patcher(LoggingMixin, KnownPackagesMixin):
 
         @wraps(obj)
         def wrapper(*args, **kwargs):
-            self._logger.debug(f'tracing `{obj_name}`.')
+            if self.LOG_CALLS:
+                self._logger.debug(f'tracing `{obj_name}`.')
             kwargs = sig.bind(*args, **kwargs)
             rv = obj(**kwargs.copy())
             kwargs.pop('self', None)  # avoid matching against bound instances.
@@ -456,7 +460,11 @@ def trace(
     track_stack=False,
     do_report=True,
     report_fp=None,
+    log_calls=False,
+    log_matching_exc=False,
 ):
+    LoggingMixin.LOG_CALLS = log_calls
+    LoggingMixin.LOG_MATCHING_EXC = log_matching_exc
     if debug:
         LoggingMixin.LEVEL = logging.DEBUG
 
