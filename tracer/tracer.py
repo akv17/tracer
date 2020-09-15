@@ -8,9 +8,17 @@ from collections import deque
 from datetime import datetime
 from functools import wraps
 from types import FunctionType, MethodType
+from time import time
+from copy import copy
+
+class ReprMixin:
+
+    def __repr__(self):
+        vars_ = ', '.join(f'{k}={v}' for k, v in vars(self).items())
+        return f'{self.__class__.__name__}({vars_})'
 
 
-class Match:
+class Match(ReprMixin):
 
     def __init__(
         self,
@@ -31,9 +39,23 @@ class Match:
         self.matcher_type = matcher_type
         self.stack = None
 
-    def __repr__(self):
-        vars_ = ', '.join(f'{k}={v}' for k, v in vars(self).items())
-        return f'{self.__class__.__name__}({vars_})'
+
+class Call(ReprMixin):
+
+    def __init__(
+        self,
+        name,
+        args,
+        retval,
+        runtime=None,
+        stack=None
+    ):
+        self.name = name
+        self.args = args
+        self.retval = retval
+        self.runtime = runtime or 0.0
+        self.stack = stack
+        self.timestamp = datetime.now()
 
 
 class LoggingMixin:
@@ -274,12 +296,15 @@ class Signature:
         return kwargs_
 
 
-class Patcher(LoggingMixin, KnownPackagesMixin):
+class Tracer(LoggingMixin, KnownPackagesMixin):
+    _REPORT_FP = 'traces.json'
 
-    def __init__(self, top_package, matchers, known_packages=None, track_stack=False):
-        super().__init__(top_package=top_package, known_packages=known_packages)
-        self.matchers = matchers
+    def __init__(self, tree, matchers=None, known_packages=None, track_stack=False):
+        super().__init__(top_package=tree.top_package, known_packages=known_packages)
+        self.tree = tree
+        self.matchers = matchers or []
         self.track_stack = track_stack
+        self.calls = []
         self._wrapped = set()
 
     @property
@@ -308,7 +333,7 @@ class Patcher(LoggingMixin, KnownPackagesMixin):
         return f'{mod_name}.{name}'
 
     @staticmethod
-    def _set_stack(matches):
+    def _get_stack():
         stack = inspect.stack()
         frames = [
             {
@@ -318,13 +343,17 @@ class Patcher(LoggingMixin, KnownPackagesMixin):
             }
             for f in stack[1:]
         ]
-        for m in matches:
-            m.stack = frames
+        return frames
 
     @staticmethod
     def _is_staticmethod(obj):
         prms = inspect.signature(obj).parameters
         return 'self' not in prms and not isinstance(obj, MethodType)
+
+    def _set_stack(self, matches):
+        frames = self._get_stack()
+        for m in matches:
+            m.stack = frames
 
     def _match_targets(self, obj_name, rv, *args, **kwargs):
         return [
@@ -341,8 +370,21 @@ class Patcher(LoggingMixin, KnownPackagesMixin):
         def wrapper(*args, **kwargs):
             if self.LOG_CALLS:
                 self._logger.debug(f'tracing `{obj_name}`.')
+
             kwargs = sig.bind(*args, **kwargs)
+            st = time()
             rv = obj(**kwargs.copy())
+            rt = round(time() - st, 4)
+            stack = self._get_stack()
+            call = Call(
+                name=obj_name,
+                args=copy(kwargs),
+                retval=copy(rv),
+                stack=stack,
+                runtime=rt
+            )
+            self.calls.append(call)
+
             kwargs.pop('self', None)  # avoid matching against bound instances.
             matches = self._match_targets(obj_name, rv, **kwargs)
             if self.track_stack:
@@ -402,28 +444,11 @@ class Patcher(LoggingMixin, KnownPackagesMixin):
 
         return mod
 
-
-class Tracer(LoggingMixin):
-    _REPORT_FP = 'traces.json'
-
-    def __init__(self, tree, patcher):
-        self.tree = tree
-        self.patcher = patcher
-
-    @property
-    def matches(self):
-        return self.patcher.matches
-
     def setup(self):
         for mod in self.tree:
-            self.patcher.patch_mod(mod)
-        msg = f'setup tracer of packages `{list(self.tree.known_packages)}` with {self.patcher.num_patched} patched objects.'
+            self.patch_mod(mod)
+        msg = f'setup tracer of packages `{list(self.tree.known_packages)}` with {self.num_patched} patched objects.'
         self._logger.debug(msg)
-
-    def exec(self, fcall):
-        self.setup()
-        co = f'from {self.tree.entry_mod_name} import *; {fcall}'
-        exec(co)
 
     def report(self, fp=None):
         def _serialize(val):
@@ -452,6 +477,29 @@ class Tracer(LoggingMixin):
             json.dump(rv, f)
 
 
+# class Tracer(LoggingMixin):
+#     _REPORT_FP = 'traces.json'
+#
+#     def __init__(self, tree, patcher):
+#         self.tree = tree
+#         self.patcher = patcher
+#
+#     @property
+#     def matches(self):
+#         return self.patcher.matches
+#
+#     def setup(self):
+#         for mod in self.tree:
+#             self.patcher.patch_mod(mod)
+#         msg = f'setup tracer of packages `{list(self.tree.known_packages)}` with {self.patcher.num_patched} patched objects.'
+#         self._logger.debug(msg)
+#
+#     def exec(self, fcall):
+#         self.setup()
+#         co = f'from {self.tree.entry_mod_name} import *; {fcall}'
+#         exec(co)
+
+
 def trace(
     func,
     args,
@@ -477,13 +525,12 @@ def trace(
         entry_mod_name=mn,
         known_packages=known_packages
     )
-    patcher = Patcher(
-        top_package=top_package,
+    tracer = Tracer(
+        tree=tree,
         matchers=matchers,
         track_stack=track_stack,
         known_packages=known_packages
     )
-    tracer = Tracer(tree=tree, patcher=patcher)
     tracer.setup()
 
     func = getattr(tree.entry_mod, func.__name__)
@@ -493,4 +540,3 @@ def trace(
         tracer.report(fp=report_fp)
 
     return tracer
-

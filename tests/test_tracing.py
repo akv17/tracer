@@ -51,7 +51,7 @@ class TestTracing(unittest.TestCase):
         imported = sorted(tracer.tree._imported)
         self.assertEqual(imported, self.expected_imported)
 
-        wrapped = sorted(tracer.patcher._wrapped)
+        wrapped = sorted(tracer._wrapped)
         self.assertEqual(wrapped, self.expected_wrapped)
 
         matches = tracer.matches
