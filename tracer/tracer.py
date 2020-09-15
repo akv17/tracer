@@ -477,29 +477,6 @@ class Tracer(LoggingMixin, KnownPackagesMixin):
             json.dump(rv, f)
 
 
-# class Tracer(LoggingMixin):
-#     _REPORT_FP = 'traces.json'
-#
-#     def __init__(self, tree, patcher):
-#         self.tree = tree
-#         self.patcher = patcher
-#
-#     @property
-#     def matches(self):
-#         return self.patcher.matches
-#
-#     def setup(self):
-#         for mod in self.tree:
-#             self.patcher.patch_mod(mod)
-#         msg = f'setup tracer of packages `{list(self.tree.known_packages)}` with {self.patcher.num_patched} patched objects.'
-#         self._logger.debug(msg)
-#
-#     def exec(self, fcall):
-#         self.setup()
-#         co = f'from {self.tree.entry_mod_name} import *; {fcall}'
-#         exec(co)
-
-
 def trace(
     func,
     args,
