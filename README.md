@@ -2,6 +2,14 @@
 a pure python tool for runtime tracing of a particular value as an argument / return value of any callable.
 
 # Example
+- this is an extremely useful example of GUI usage.
+```
+from tracer.gui import TracerGUI
+from tests.test_proj.main import main
+
+tracer = TracerGUI()
+tracer.trace(main, args=(2,))
+```
 - this is an extremely useful module `foo.py`. 
 ```
 class Baz:
