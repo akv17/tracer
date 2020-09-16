@@ -22,17 +22,36 @@ class TreeWidget(ttk.Treeview):
                 q.append((ch_ix, ch_data))
 
 
-class CallInfoWidget(tkinter.Frame):
+class CallInfoTableWidget(tkinter.Frame):
 
     def __init__(self, parent, call, background='black', **kwargs):
         super().__init__(parent, background=background, **kwargs)
-
         info = self._get_info(call)
         for i, row in enumerate(info):
             cols = row
             for j, col in enumerate(cols):
                 label = ttk.Label(self, text=col)
                 label.grid(row=i, column=j, sticky='nsew', padx=1, pady=1)
+
+    def _get_info(self, call):
+        return [
+            ['uname', call.uname],
+            ['caller', call.caller.uname],
+            ['runtime', call.runtime],
+            ['call_time', call.calltime],
+            ['return_time', call.rettime],
+        ]
+
+
+class CallInfoWidget(tkinter.Frame):
+
+    def __init__(self, parent, call, **kwargs):
+        super().__init__(parent, **kwargs)
+
+        self._table = CallInfoTableWidget(parent=self, call=call)
+        self._label = ttk.Label(self, text='Info')
+        self._label.pack(side='top')
+        self._table.pack(side='bottom')
 
     def _get_info(self, call):
         return [
