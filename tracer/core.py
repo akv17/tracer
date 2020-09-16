@@ -78,17 +78,6 @@ class Call:
     def uname(self):
         return f'{self.name}:{self.id}'
 
-    def on_call(self, root):
-        self.name = _get_frame_qual_name(root, self.frame)
-        self.args = _get_frame_args(self.frame)
-        self.call_timestamp = time()
-        self.caller = _get_frame_qual_name(root, self.frame.f_back)
-
-    def after_call(self, retval=None):
-        self.locals = _get_frame_args(self.frame)
-        self.ret_timestamp = time()
-        self.retval = retval
-
     def as_table(self):
         content = []
         attrs = list(vars(self))
@@ -113,9 +102,6 @@ class Run:
     def __len__(self):
         return len(self.calls)
 
-    def peek_call(self):
-        return self.calls[-1] if self.calls else None
-
     def add_call(self, call):
         call.num = len(self)
         self.calls.append(call)
@@ -129,11 +115,12 @@ class Run:
         return self._calls_uname_map.get(uname)
 
     def _get_caller_call(self, frame):
-        caller_call = self.get_call_by_frame(frame.f_back)
-        if caller_call is None:
-            caller_name = _get_frame_qual_name(self.root, frame.f_back)
-            caller_call = Call(frame=frame.f_back, name=caller_name)
-        return caller_call
+        caller_frame = frame.f_back
+        call = self.get_call_by_frame(caller_frame)
+        if call is None:
+            name = _get_frame_qual_name(root=self.root, frame=caller_frame)
+            call = Call(frame=caller_frame, name=name)
+        return call
 
     def on_call(self, frame):
         name = _get_frame_qual_name(self.root, frame)
@@ -149,7 +136,7 @@ class Run:
         )
         self.add_call(call)
 
-    def after_call(self, frame, retval):
+    def on_return(self, frame, retval):
         call = self.get_call_by_frame(frame)
         if call is None:
             msg = f'got return `{frame}` of untraced frame.'
@@ -213,12 +200,11 @@ def trace(func, args, kwargs=None):
             if event == 'call':
                 run.on_call(frame)
             elif event == 'return':
-                run.after_call(frame=frame, retval=copy(arg))
+                run.on_return(frame=frame, retval=copy(arg))
 
         return tracer
 
     sys.settrace(tracer)
     func(*args, **kwargs)
     sys.settrace(None)
-
     return run
