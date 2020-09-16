@@ -1,5 +1,6 @@
 import sys
 import inspect
+import re
 from dataclasses import dataclass, field
 from typing import Any
 from pathlib import Path
@@ -7,6 +8,10 @@ from copy import copy
 from time import time
 from datetime import datetime
 from collections import defaultdict
+
+
+CLASS_NAME_REGEXP = re.compile(r'class\s+([\w_\d]+):')
+SELF_REGEXP = re.compile(r'\(\s*self[\s,)]+')
 
 
 def _matches_root(root, path):
@@ -22,14 +27,6 @@ def _get_frame_path(frame):
     return frame.f_code.co_filename
 
 
-def _get_frame_qual_name(root, frame):
-    path = frame.f_code.co_filename
-    rel_path = Path(path).relative_to(root)
-    qn = '.'.join(rel_path.parts[:-1])
-    qn = f'{qn}.{frame.f_code.co_name}'
-    return qn
-
-
 def _get_frame_locals(frame):
     return copy(frame.f_locals)
 
@@ -38,6 +35,56 @@ def _get_frame_args(frame):
     args = copy(inspect.getargvalues(frame))
     args = {name: copy(args.locals[name]) for name in args.args}
     return args
+
+
+def _find_method_class_name(lines):
+    for ln in reversed(lines):
+        if ln.strip().startswith('class'):
+            match = CLASS_NAME_REGEXP.search(ln)
+            if match is not None:
+                cn = match.group(1)
+                return cn
+
+
+def _is_any_method(first_lineno, lines):
+    first_line = lines[first_lineno]
+    if SELF_REGEXP.search(first_line) is not None:
+        return True
+    for ln in lines[first_lineno:]:
+        ln = ln.strip()
+        if ln.startswith('@staticmethod') or ln.startswith('@classmethod'):
+            return True
+        elif not ln.startswith('@'):
+            return False
+
+
+def _get_frame_local_name(frame):
+    fp = frame.f_code.co_filename
+    with open(fp, 'r') as f:
+        lines = f.readlines()
+
+    frame_name = frame.f_code.co_name
+    first_lineno = frame.f_code.co_firstlineno - 1
+
+    if _is_any_method(first_lineno=first_lineno, lines=lines):
+        lines = lines[:first_lineno]
+        cls_name = _find_method_class_name(lines)
+        if cls_name is None:
+            msg = f'could not find class name of method frame `{frame}`.'
+            raise Exception(msg)
+        frame_name = f'{cls_name}.{frame_name}'
+
+    return frame_name
+
+
+def _get_frame_qual_name(root, frame):
+    frame_name = _get_frame_local_name(frame)
+    path = Path(frame.f_code.co_filename)
+    path = path.relative_to(root)
+    path_name = '.'.join(path.parts[:-1])
+    if path_name:
+        frame_name = f'{path_name}.{frame_name}'
+    return frame_name
 
 
 @dataclass
