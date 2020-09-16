@@ -31,11 +31,8 @@ class CallVarsWidget(tkinter.Frame):
         for i, row in enumerate(content):
             cols = row
             for j, col in enumerate(cols):
-                label = ttk.Label(
-                    self,
-                    text=col,
-                )
-                label.grid(row=i, column=j, sticky="nsew", padx=1, pady=1)
+                label = ttk.Label(self, text=col)
+                label.grid(row=i, column=j, sticky='nsew', padx=1, pady=1)
 
 
 class CallSourceWidget(tkinter.Frame):
@@ -66,15 +63,15 @@ class Tracer:
 
         self._root = tkinter.Tk()
         self._root.geometry(f'{self.width}x{self.height}')
-        self.wtree = CallTreeWidget(self._root)
-        self.wtree.bind('<Double-1>', self.on_double_click)
+        self.w_call_tree = CallTreeWidget(self._root)
+        self.w_call_tree.bind('<Button-1>', self.on_double_click)
 
         self._run = None
         self._dynamic_widgets = {'w_call_inspect': None}
 
-    def _get_selected_call(self):
-        item = self.wtree.selection()[0]
-        uname = self.wtree.item(item, 'text')
+    def _get_selected_call(self, event):
+        item = self.w_call_tree.identify('item', event.x, event.y)
+        uname = self.w_call_tree.item(item, 'text')
         call = self._run.get_call_by_uname(uname)
         return call
 
@@ -85,14 +82,15 @@ class Tracer:
 
     def on_double_click(self, event):
         self._reset_dynamic_widgets()
-        call = self._get_selected_call()
-        w_call_inspect = CallInspectWidget(parent=self._root, call=call)
-        self._dynamic_widgets['w_call_inspect'] = w_call_inspect
-        w_call_inspect.pack()
+        call = self._get_selected_call(event)
+        if call is not None:
+            w_call_inspect = CallInspectWidget(parent=self._root, call=call)
+            self._dynamic_widgets['w_call_inspect'] = w_call_inspect
+            w_call_inspect.pack()
 
     def trace(self, func, args, kwargs=None):
         self._run = trace(func=func, args=args, kwargs=kwargs)
         tree_data = self._run.create_tree()
-        self.wtree.build(tree_data)
-        self.wtree.pack(fill='both')
+        self.w_call_tree.build(tree_data)
+        self.w_call_tree.pack(fill='both')
         self._root.mainloop()
