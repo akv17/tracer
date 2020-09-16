@@ -55,7 +55,7 @@ class CallInfoWidget(tkinter.Frame):
 
     def _get_info(self, call):
         return [
-            ['uname', call.uname],
+            ['name', call.uname],
             ['caller', call.caller.uname],
             ['runtime', call.runtime],
             ['call_time', call.calltime],
@@ -96,7 +96,7 @@ class CallSourceWidget(tkinter.Frame):
 
     def _prettify_src(self, src, ln_offset=0):
         lns = src.split('\n')
-        src = '\n'.join(f'{i + ln_offset} {i + 1}  {ln}' for i, ln in enumerate(lns))
+        src = '\n'.join(f'{i + ln_offset}\t| {ln}' for i, ln in enumerate(lns))
         return src
 
 
