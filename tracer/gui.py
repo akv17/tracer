@@ -47,20 +47,10 @@ class CallInfoWidget(tkinter.Frame):
 
     def __init__(self, parent, call, **kwargs):
         super().__init__(parent, **kwargs)
-
         self._table = CallInfoTableWidget(parent=self, call=call)
         self._label = ttk.Label(self, text='Info')
         self._label.pack(side='top')
         self._table.pack(side='bottom')
-
-    def _get_info(self, call):
-        return [
-            ['name', call.uname],
-            ['caller', call.caller.uname],
-            ['runtime', call.runtime],
-            ['call_time', call.calltime],
-            ['return_time', call.rettime],
-        ]
 
 
 class CallVarsWidget(tkinter.Frame):
