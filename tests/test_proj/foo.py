@@ -8,7 +8,8 @@ class Foo:
         return x + 1
 
     def foo(self, x):
-        return -x
+        x = -x
+        return x
 
     @staticmethod
     def bar(x):
