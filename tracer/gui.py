@@ -6,10 +6,10 @@ from tkinter import ttk
 from .core import trace
 
 
-class CallTreeWidget(ttk.Treeview):
+class TreeWidget(ttk.Treeview):
 
-    def __init__(self, *args, unfolded=True, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, parent, unfolded=False, **kwargs):
+        super().__init__(parent, **kwargs)
         self.unfolded = unfolded
 
     def build(self, data):
@@ -22,17 +22,46 @@ class CallTreeWidget(ttk.Treeview):
                 q.append((ch_ix, ch_data))
 
 
-class CallVarsWidget(tkinter.Frame):
+class CallInfoWidget(tkinter.Frame):
 
     def __init__(self, parent, call, background='black', **kwargs):
         super().__init__(parent, background=background, **kwargs)
 
-        content = call.as_table()
-        for i, row in enumerate(content):
+        info = self._get_info(call)
+        for i, row in enumerate(info):
             cols = row
             for j, col in enumerate(cols):
                 label = ttk.Label(self, text=col)
                 label.grid(row=i, column=j, sticky='nsew', padx=1, pady=1)
+
+    def _get_info(self, call):
+        return [
+            ['uname', call.uname],
+            ['caller', call.caller.uname],
+            ['runtime', call.runtime],
+            ['call_time', call.calltime],
+            ['return_time', call.rettime],
+        ]
+
+
+class CallVarsWidget(tkinter.Frame):
+
+    def __init__(self, parent, call, which, **kwargs):
+        super().__init__(parent, **kwargs)
+        tree_data = self._create_tree_data(call, which)
+        w_tree = TreeWidget(self, unfolded=False)
+        w_tree.heading('#0', text=which)
+        w_tree.build(tree_data)
+        w_tree.pack()
+
+    def _create_tree_data(self, call, which_vars):
+        vars_ = getattr(call, which_vars)
+        if which_vars == 'retval':
+            vars_ = {which_vars: vars_}
+        tree_data = {}
+        for k, v in vars_.items():
+            tree_data[str(k)] = {f'value: {str(v)}': {}}
+        return tree_data
 
 
 class CallSourceWidget(tkinter.Frame):
@@ -56,10 +85,16 @@ class CallInspectWidget(tkinter.Frame):
 
     def __init__(self, parent, call, **kwargs):
         super().__init__(parent, **kwargs)
-        w_vars = CallVarsWidget(parent=self, call=call)
+        w_info = CallInfoWidget(parent=self, call=call)
         w_src = CallSourceWidget(parent=self, call=call)
-        w_vars.grid(row=0, column=1)
-        w_src.grid(row=0, column=0)
+        w_args = CallVarsWidget(parent=self, call=call, which='args')
+        w_retval = CallVarsWidget(parent=self, call=call, which='retval')
+        w_locals = CallVarsWidget(parent=self, call=call, which='locals')
+        w_info.grid(row=0, column=0)
+        w_src.grid(row=2, column=0)
+        w_args.grid(row=2, column=6)
+        w_retval.grid(row=2, column=8)
+        w_locals.grid(row=2, column=10)
 
 
 class Tracer:
@@ -70,7 +105,7 @@ class Tracer:
 
         self._root = tkinter.Tk()
         self._root.geometry(f'{self.width}x{self.height}')
-        self.w_call_tree = CallTreeWidget(self._root)
+        self.w_call_tree = TreeWidget(self._root, unfolded=True)
         self.w_call_tree.bind('<Button-1>', self.on_double_click)
 
         self._run = None
@@ -97,7 +132,7 @@ class Tracer:
 
     def trace(self, func, args, kwargs=None):
         self._run = trace(func=func, args=args, kwargs=kwargs)
-        tree_data = self._run.create_tree()
+        tree_data = self._run.create_tree_data()
         self.w_call_tree.build(tree_data)
         self.w_call_tree.pack(fill='both')
         self._root.mainloop()
