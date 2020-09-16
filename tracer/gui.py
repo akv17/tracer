@@ -35,7 +35,7 @@ class CallInfoTableWidget(tkinter.Frame):
 
     def _get_info(self, call):
         return [
-            ['uname', call.uname],
+            ['name', call.uname],
             ['caller', call.caller.uname],
             ['runtime', call.runtime],
             ['call_time', call.calltime],
