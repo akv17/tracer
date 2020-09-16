@@ -48,7 +48,7 @@ class CallSourceWidget(tkinter.Frame):
         text.pack()
 
 
-class TracerGUI:
+class Tracer:
 
     def __init__(self, width=1000, height=1000):
         self.width = width
