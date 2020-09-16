@@ -118,12 +118,9 @@ class CallInspectWidget(tkinter.Frame):
 
 class Tracer:
 
-    def __init__(self, width=1000, height=1000):
-        self.width = width
-        self.height = height
-
+    def __init__(self):
         self._root = tkinter.Tk()
-        self._root.geometry(f'{self.width}x{self.height}')
+        self._root.attributes('-zoomed', True)
         self.w_call_tree = TreeWidget(self._root, unfolded=True)
         self.w_call_tree.bind('<Button-1>', self.on_double_click)
 
