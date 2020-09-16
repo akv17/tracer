@@ -125,18 +125,6 @@ class Call:
     def uname(self):
         return f'{self.name}:{self.id}'
 
-    def as_table(self):
-        content = []
-        attrs = list(vars(self))
-        props = [a for a in dir(self) if isinstance(getattr(self.__class__, a), property)]
-        attrs += props
-        for attr in attrs:
-            val = getattr(self, attr)
-            if attr == 'caller':
-                val = val.uname
-            content.append([str(attr), str(val)])
-        return content
-
 
 @dataclass
 class Run:
@@ -189,11 +177,11 @@ class Run:
             msg = f'got return `{frame}` of untraced frame.'
             raise Exception(msg)
 
-        call.locals = _get_frame_args(frame)
+        call.locals = _get_frame_locals(frame)
         call.ret_timestamp = time()
         call.retval = copy(retval)
 
-    def create_tree(self):
+    def create_tree_data(self):
 
         def insert_level(cache, accum, name):
             leaves = cache[name]
