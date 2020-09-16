@@ -1,4 +1,6 @@
 import tkinter
+import inspect
+from collections import deque
 from tkinter import ttk
 
 from .core import trace
@@ -11,7 +13,6 @@ class CallTreeWidget(ttk.Treeview):
         self.unfolded = unfolded
 
     def build(self, data):
-        from collections import deque
         q = deque([('', data)])
         while q:
             par_ix, par_data = q.popleft()
@@ -41,11 +42,20 @@ class CallSourceWidget(tkinter.Frame):
 
     def __init__(self, parent, call, **kwargs):
         super().__init__(parent, **kwargs)
-        import inspect
         src = inspect.getsource(call.frame)
         text = tkinter.Text(self)
         text.insert(tkinter.INSERT, src)
         text.pack()
+
+
+class CallInspectWidget(tkinter.Frame):
+
+    def __init__(self, parent, call, **kwargs):
+        super().__init__(parent, **kwargs)
+        w_vars = CallVarsWidget(parent=self, call=call)
+        w_src = CallSourceWidget(parent=self, call=call)
+        w_vars.grid(row=0, column=1)
+        w_src.grid(row=0, column=0)
 
 
 class Tracer:
@@ -60,10 +70,7 @@ class Tracer:
         self.wtree.bind('<Double-1>', self.on_double_click)
 
         self._run = None
-        self._state = {
-            'wvars': None,
-            'wsrc': None,
-        }
+        self._dynamic_widgets = {'w_call_inspect': None}
 
     def _get_selected_call(self):
         item = self.wtree.selection()[0]
@@ -71,20 +78,17 @@ class Tracer:
         call = self._run.get_call_by_uname(uname)
         return call
 
-    def _reset_state(self):
-        for w in self._state.values():
+    def _reset_dynamic_widgets(self):
+        for w in self._dynamic_widgets.values():
             if w is not None:
                 w.pack_forget()
 
     def on_double_click(self, event):
-        self._reset_state()
+        self._reset_dynamic_widgets()
         call = self._get_selected_call()
-        wvars = CallVarsWidget(parent=self._root, call=call)
-        wsrc = CallSourceWidget(parent=self._root, call=call)
-        self._state['wvars'] = wvars
-        self._state['wsrc'] = wsrc
-        wvars.pack(side='right')
-        wsrc.pack(side='left')
+        w_call_inspect = CallInspectWidget(parent=self._root, call=call)
+        self._dynamic_widgets['w_call_inspect'] = w_call_inspect
+        w_call_inspect.pack()
 
     def trace(self, func, args, kwargs=None):
         self._run = trace(func=func, args=args, kwargs=kwargs)
