@@ -39,10 +39,17 @@ class CallSourceWidget(tkinter.Frame):
 
     def __init__(self, parent, call, **kwargs):
         super().__init__(parent, **kwargs)
+        first_lineno = call.frame.f_code.co_firstlineno
         src = inspect.getsource(call.frame)
+        src = self._prettify_src(src, ln_offset=first_lineno)
         text = tkinter.Text(self)
         text.insert(tkinter.INSERT, src)
         text.pack()
+
+    def _prettify_src(self, src, ln_offset=0):
+        lns = src.split('\n')
+        src = '\n'.join(f'{i + ln_offset} {i + 1}  {ln}' for i, ln in enumerate(lns))
+        return src
 
 
 class CallInspectWidget(tkinter.Frame):
