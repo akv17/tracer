@@ -11,7 +11,7 @@ from collections import defaultdict
 
 
 CLASS_NAME_REGEXP = re.compile(r'class\s+([\w_\d]+):')
-SELF_REGEXP = re.compile(r'\(\s*self[\s,)]+')
+SELF_ARG_REGEXP = re.compile(r'\(\s*self[\s,)]+')
 
 
 def _matches_root(root, path):
@@ -48,7 +48,7 @@ def _find_method_class_name(lines):
 
 def _is_any_method(first_lineno, lines):
     first_line = lines[first_lineno]
-    if SELF_REGEXP.search(first_line) is not None:
+    if SELF_ARG_REGEXP.search(first_line) is not None:
         return True
     for ln in lines[first_lineno:]:
         ln = ln.strip()
@@ -222,7 +222,7 @@ class Run:
         return data
 
 
-def get_root_path(func):
+def _get_root_path(func):
     mod = func.__module__
     top_pkg = mod.split('.')[0]
     fpath = Path(func.__code__.co_filename)
@@ -239,7 +239,7 @@ def get_root_path(func):
 
 def trace(func, args, kwargs=None):
     kwargs = kwargs or {}
-    root = get_root_path(func)
+    root = _get_root_path(func)
     run = Run(root=root)
 
     def tracer(frame, event, arg):
