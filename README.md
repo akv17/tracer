@@ -4,10 +4,10 @@ a pure python tool for runtime tracing of a particular value as an argument / re
 # Example
 - this is an extremely useful example of GUI usage.
 ```
-from tracer.gui import TracerGUI
+from tracer.gui_qt import Tracer
 from tests.test_proj.main import main
 
-tracer = TracerGUI()
+tracer = Tracer()
 tracer.trace(main, args=(2,))
 ```
 - this is an extremely useful module `foo.py`. 
