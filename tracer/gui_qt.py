@@ -159,7 +159,7 @@ class CallSourceCodeWidget(QtWidgets.QTextEdit):
             self._par_w.on_double_click()
 
 
-class CallSourceInspectWidget(QtWidgets.QWidget):
+class CallInspectWidget(QtWidgets.QWidget):
 
     def __init__(self, call, parent=None):
         super().__init__(parent=parent)
@@ -168,10 +168,12 @@ class CallSourceInspectWidget(QtWidgets.QWidget):
         self.active_line_num = None
         self.active_block_num = None
 
+        self._w_info = CallInfoWidget(parent=self, call=call)
         self._w_code = CallSourceCodeWidget(_par_w=self, parent=self, call=call)
         self._w_vars = None
 
         self.layout = QtWidgets.QHBoxLayout(self)
+        self.layout.addWidget(self._w_info)
         self.layout.addWidget(self._w_code)
 
     def _reset_widgets(self):
@@ -196,19 +198,6 @@ class CallSourceInspectWidget(QtWidgets.QWidget):
         self._add_widgets()
         if self.active_block_num is not None:
             self._w_code.highlight_block(self.active_block_num)
-
-
-class CallInspectWidget(QtWidgets.QWidget):
-
-    def __init__(self, call, parent=None):
-        super().__init__(parent=parent)
-        self.call = call
-        self._w_info = CallInfoWidget(parent=self, call=call)
-        self._w_src = CallSourceInspectWidget(parent=self, call=call)
-
-        self.layout = QtWidgets.QHBoxLayout(self)
-        self.layout.addWidget(self._w_info)
-        self.layout.addWidget(self._w_src)
 
 
 class MainWindow(QtWidgets.QWidget):
