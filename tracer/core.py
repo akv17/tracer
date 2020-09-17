@@ -88,6 +88,13 @@ def _get_frame_qual_name(root, frame):
 
 
 @dataclass
+class Line:
+    frame: Any = None
+    num: Any = None
+    locals: Any = field(default_factory=dict)
+
+
+@dataclass
 class Call:
     frame: Any = None
     name: Any = None
@@ -98,6 +105,7 @@ class Call:
     num: Any = None
     call_timestamp: Any = field(default=None, repr=False)
     ret_timestamp: Any = field(default=None, repr=False)
+    lines: Any = field(default_factory=list, repr=False)
 
     @property
     def calltime(self):
@@ -124,6 +132,9 @@ class Call:
     @property
     def uname(self):
         return f'{self.name}:{self.id}'
+
+    def get_line(self, i):
+        return self.lines[i]
 
 
 @dataclass
@@ -170,6 +181,13 @@ class Run:
             caller=caller_call
         )
         self.add_call(call)
+
+    def on_line(self, frame):
+        locals_ = _get_frame_locals(frame)
+        num = frame.f_lineno
+        ln = Line(frame=frame, num=num, locals=locals_)
+        call = self.get_call_by_frame(frame)
+        call.lines.append(ln)
 
     def on_return(self, frame, retval):
         call = self.get_call_by_frame(frame)
@@ -234,6 +252,8 @@ def trace(func, args, kwargs=None):
         if _recognize_frame(root, frame):
             if event == 'call':
                 run.on_call(frame)
+            elif event == 'line':
+                run.on_line(frame)
             elif event == 'return':
                 run.on_return(frame=frame, retval=copy(arg))
 
