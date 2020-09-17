@@ -59,7 +59,7 @@ class CallInfoWidget(QtWidgets.QTableWidget):
 
 class CallSourceLineFormatHandler:
 
-    def __init__(self, color=(84, 204, 182)):
+    def __init__(self, color=(29, 128, 110)):
         self.color = color
 
     def apply(self, cursor, line_num):
@@ -240,13 +240,16 @@ class MainWindow(QtWidgets.QWidget):
 
 class Tracer:
 
-    def __init__(self, win_size=(1920, 1080)):
+    def __init__(self, win_size=(1920, 1080), dark_theme=True):
         super().__init__()
-        self._loop = QtWidgets.QApplication(sys.argv)
+        import qdarkstyle
+        self._app = QtWidgets.QApplication(sys.argv)
+        if dark_theme:
+            self._app.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyside2'))
         self._win = MainWindow(size=win_size)
 
     def trace(self, func, args, kwargs=None):
         run = trace(func=func, args=args, kwargs=kwargs)
         self._win.on_trace(run)
         self._win.show()
-        self._loop.exec_()
+        self._app.exec_()
