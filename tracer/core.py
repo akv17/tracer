@@ -89,23 +89,24 @@ def _get_frame_qual_name(root, frame):
 
 @dataclass
 class Line:
-    frame: Any = None
+    frame: Any = field(default=None, repr=False)
     num: Any = None
-    locals: Any = field(default_factory=dict)
+    src: Any = None
+    locals: Any = field(default_factory=dict, repr=False)
 
 
 @dataclass
 class Call:
-    frame: Any = None
+    frame: Any = field(default=None, repr=False)
     name: Any = None
     args: Any = None
-    locals: Any = None
+    locals: Any = field(default_factory=dict, repr=False)
     retval: Any = None
     caller: Any = None
     num: Any = None
     call_timestamp: Any = field(default=None, repr=False)
     ret_timestamp: Any = field(default=None, repr=False)
-    lines: Any = field(default_factory=list, repr=False)
+    lines: Any = field(default_factory=dict, repr=False)
 
     @property
     def calltime(self):
@@ -133,8 +134,11 @@ class Call:
     def uname(self):
         return f'{self.name}:{self.id}'
 
-    def get_line(self, i):
-        return self.lines[i]
+    def add_line(self, line):
+        self.lines[line.num] = line
+
+    def get_line(self, num):
+        return self.lines.get(num)
 
 
 @dataclass
@@ -185,9 +189,11 @@ class Run:
     def on_line(self, frame):
         locals_ = _get_frame_locals(frame)
         num = frame.f_lineno
-        ln = Line(frame=frame, num=num, locals=locals_)
+        with open(frame.f_code.co_filename, 'r') as f:
+            src = f.readlines()[num - 1]
+        ln = Line(frame=frame, num=num, src=src, locals=locals_)
         call = self.get_call_by_frame(frame)
-        call.lines.append(ln)
+        call.add_line(ln)
 
     def on_return(self, frame, retval):
         call = self.get_call_by_frame(frame)
