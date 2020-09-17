@@ -59,35 +59,27 @@ class CallInfoWidget(QtWidgets.QTableWidget):
 
 class CallSourceLineFormatHandler:
 
-    def __init__(self, color=(0, 255, 0)):
+    def __init__(self, color=(84, 204, 182)):
         self.color = color
-        self._lts_block_num = None
-
-    def _reset_lts_block(self, cursor):
-        if self._lts_block_num is not None:
-            doc = cursor.document()
-            block = doc.findBlockByNumber(self._lts_block_num)
-            fmt = block.blockFormat()
-            brush = QtGui.QBrush(QtGui.QColor(255, 0, 0))
-            fmt.setBackground(brush)
-            cursor.setBlockFormat(fmt)
 
     def apply(self, cursor, line_num):
-        self._reset_lts_block(cursor)
-        self._lts_block_num = line_num
+        for i in range(line_num + 1):
+            if i == line_num:
+                break
+            cursor.movePosition(QtGui.QTextCursor.NextBlock)
+            cursor.movePosition(QtGui.QTextCursor.EndOfBlock, QtGui.QTextCursor.KeepAnchor)
+
         doc = cursor.document()
         block = doc.findBlockByNumber(line_num)
         fmt = block.blockFormat()
         brush = QtGui.QBrush(QtGui.QColor(*self.color))
         fmt.setBackground(brush)
-        cursor.setPosition(block.begin(), QtGui.QTextCursor.MoveAnchor)
-        cursor.setPosition(block.end(), QtGui.QTextCursor.KeepAnchor)
         cursor.setBlockFormat(fmt)
 
 
 class CallVarsWidget(QtWidgets.QTabWidget):
 
-    def __init__(self, call, line_num=None, parent=None):
+    def __init__(self, call, line_num, parent=None):
         super().__init__(parent=parent)
         self.call = call
         self.line_num = line_num
@@ -103,8 +95,9 @@ class CallVarsWidget(QtWidgets.QTabWidget):
             vars_ = {'value': getattr(self.call, which_vars)}
         elif which_vars == 'locals':
             if self.line_num is not None:
+                # TODO: watch out for None line.
                 line = self.call.get_line(self.line_num)
-                vars_ = getattr(line, which_vars)
+                vars_ = getattr(line, which_vars, {})
             else:
                 vars_ = getattr(self.call, which_vars)
         else:
@@ -132,7 +125,7 @@ class CallSourceCodeWidget(QtWidgets.QTextEdit):
         self.setReadOnly(True)
         self.mouseDoubleClickEvent = self.on_double_click
         self.layout = QtWidgets.QHBoxLayout(self)
-        self.active_line_num = None
+        self._fmt = CallSourceLineFormatHandler()
 
     def _setup_text(self):
         ln_offset = self.call.frame.f_code.co_firstlineno
@@ -149,14 +142,21 @@ class CallSourceCodeWidget(QtWidgets.QTextEdit):
         self._w_vars = CallVarsWidget(parent=self, call=self.call, line_num=line_num)
         self.layout.addWidget(self._w_vars)
 
+    def highlight_block(self, block_num):
+        cursor = self.textCursor()
+        self._fmt.apply(cursor, block_num)
+
     @QtCore.Slot()
     def on_double_click(self, event):
         # TODO: terrible hack.
         cursor = self.textCursor()
-        line_num = cursor.blockNumber()
-        line_num = self._line_num_map[line_num]
-        self._par_w.active_line_num = line_num
-        self._par_w.on_double_click()
+        block_num = cursor.blockNumber()
+        line_num = self._line_num_map[block_num]
+        if line_num is not None:
+            self._par_w.active_line_num = line_num
+            self._par_w.active_block_num = block_num
+            self._par_w._cursor = cursor
+            self._par_w.on_double_click()
 
 
 class CallSourceInspectWidget(QtWidgets.QWidget):
@@ -164,30 +164,38 @@ class CallSourceInspectWidget(QtWidgets.QWidget):
     def __init__(self, call, parent=None):
         super().__init__(parent=parent)
         self.call = call
+
+        self.active_line_num = None
+        self.active_block_num = None
+
         self._w_code = CallSourceCodeWidget(_par_w=self, parent=self, call=call)
         self._w_vars = None
-        self.active_line_num = None
 
         self.layout = QtWidgets.QHBoxLayout(self)
         self.layout.addWidget(self._w_code)
 
-    def _reset_vars_widget(self):
+    def _reset_widgets(self):
         if self._w_vars is not None:
             self._w_vars.setParent(None)
+        self._w_code.setParent(None)
 
-    def _add_vars_widget(self):
-        self._w_vars = CallVarsWidget(
-            parent=self,
-            call=self.call,
-            line_num=self.active_line_num
-        )
-        self.layout.addWidget(self._w_vars)
+    def _add_widgets(self):
+        self._w_code = CallSourceCodeWidget(_par_w=self, parent=self, call=self.call)
+        self.layout.addWidget(self._w_code)
+        if self.active_line_num is not None:
+            self._w_vars = CallVarsWidget(
+                parent=self,
+                call=self.call,
+                line_num=self.active_line_num
+            )
+            self.layout.addWidget(self._w_vars)
 
     def on_double_click(self):
         # TODO: terrible hack.
-        if self.active_line_num is not None:
-            self._reset_vars_widget()
-            self._add_vars_widget()
+        self._reset_widgets()
+        self._add_widgets()
+        if self.active_block_num is not None:
+            self._w_code.highlight_block(self.active_block_num)
 
 
 class CallInspectWidget(QtWidgets.QWidget):
@@ -243,7 +251,7 @@ class MainWindow(QtWidgets.QWidget):
 
 class Tracer:
 
-    def __init__(self, win_size=(800, 800)):
+    def __init__(self, win_size=(1920, 1080)):
         super().__init__()
         self._loop = QtWidgets.QApplication(sys.argv)
         self._win = MainWindow(size=win_size)
