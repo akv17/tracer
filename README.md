@@ -1,5 +1,5 @@
 # Description
-a pure python tool for runtime tracing of a particular value as an argument / return value of any callable.
+a GUI tool for timeless tracing of python function / method calls.
 
 # Example
 - this is an extremely useful example of tracing.
