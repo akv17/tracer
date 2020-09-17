@@ -10,4 +10,4 @@ from tests.test_proj.main import main
 tracer = Tracer()
 tracer.trace(main, args=(2,))
 ```
-![](examples/example.jpg)
+![](examples/example.png)
