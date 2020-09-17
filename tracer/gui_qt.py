@@ -240,7 +240,7 @@ class MainWindow(QtWidgets.QWidget):
 
 class Tracer:
 
-    def __init__(self, win_size=(1920, 1080), dark_theme=False):
+    def __init__(self, win_size=(1920, 1080), dark_theme=True):
         super().__init__()
         self._app = QtWidgets.QApplication(sys.argv)
         if dark_theme:
