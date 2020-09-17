@@ -240,11 +240,11 @@ class MainWindow(QtWidgets.QWidget):
 
 class Tracer:
 
-    def __init__(self, win_size=(1920, 1080), dark_theme=True):
+    def __init__(self, win_size=(1920, 1080), dark_theme=False):
         super().__init__()
-        import qdarkstyle
         self._app = QtWidgets.QApplication(sys.argv)
         if dark_theme:
+            import qdarkstyle
             self._app.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyside2'))
         self._win = MainWindow(size=win_size)
 
