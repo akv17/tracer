@@ -85,10 +85,42 @@ class CallSourceLineFormatHandler:
         cursor.setBlockFormat(fmt)
 
 
-class CallSourceWidget(QtWidgets.QTextEdit):
+class CallVarsWidget(QtWidgets.QTabWidget):
 
-    def __init__(self, call, parent=None):
+    def __init__(self, call, line_num=None, parent=None):
         super().__init__(parent=parent)
+        self.call = call
+        self.line_num = line_num
+
+        for vars_name in ('locals', 'args', 'retval'):
+            w_vars_tree = TreeWidget(expanded=True)
+            tree_data = self._create_tree_data(which_vars=vars_name)
+            w_vars_tree.build(tree_data)
+            self.addTab(w_vars_tree, vars_name)
+
+    def _create_tree_data(self, which_vars):
+        if which_vars == 'retval':
+            vars_ = {'value': getattr(self.call, which_vars)}
+        elif which_vars == 'locals':
+            if self.line_num is not None:
+                line = self.call.get_line(self.line_num)
+                vars_ = getattr(line, which_vars)
+            else:
+                vars_ = getattr(self.call, which_vars)
+        else:
+            vars_ = getattr(self.call, which_vars)
+
+        tree_data = {}
+        for k, v in vars_.items():
+            tree_data[str(k)] = {f'value: {str(v)}\ntype: {type(v)}': {}}
+        return tree_data
+
+
+class CallSourceCodeWidget(QtWidgets.QTextEdit):
+
+    def __init__(self, _par_w, call, parent=None):
+        super().__init__(parent=parent)
+        self._par_w = _par_w
         self.call = call
 
         # from local zero-started nums to real src file nums.
@@ -99,7 +131,8 @@ class CallSourceWidget(QtWidgets.QTextEdit):
         self.setText(self.text)
         self.setReadOnly(True)
         self.mouseDoubleClickEvent = self.on_double_click
-        self._line_fmt_handler = CallSourceLineFormatHandler()
+        self.layout = QtWidgets.QHBoxLayout(self)
+        self.active_line_num = None
 
     def _setup_text(self):
         ln_offset = self.call.frame.f_code.co_firstlineno
@@ -108,37 +141,53 @@ class CallSourceWidget(QtWidgets.QTextEdit):
         self.text = '\n'.join(f'{i + ln_offset}\t| {ln}' for i, ln in enumerate(lns))
         self._line_num_map = {i: i + ln_offset for i in range(len(lns))}
 
+    def _reset_vars_widget(self):
+        if self._w_vars is not None:
+            self._w_vars.setParent(None)
+
+    def _add_vars_widget(self, line_num):
+        self._w_vars = CallVarsWidget(parent=self, call=self.call, line_num=line_num)
+        self.layout.addWidget(self._w_vars)
+
     @QtCore.Slot()
     def on_double_click(self, event):
+        # TODO: terrible hack.
         cursor = self.textCursor()
         line_num = cursor.blockNumber()
         line_num = self._line_num_map[line_num]
-        ln = self.call.get_line(line_num)
-        if ln is not None:
-            pass
-            # self._line_fmt_handler.apply(cursor, line_num)
+        self._par_w.active_line_num = line_num
+        self._par_w.on_double_click()
 
 
-class CallVarsWidget(QtWidgets.QTabWidget):
+class CallSourceInspectWidget(QtWidgets.QWidget):
 
     def __init__(self, call, parent=None):
         super().__init__(parent=parent)
         self.call = call
+        self._w_code = CallSourceCodeWidget(_par_w=self, parent=self, call=call)
+        self._w_vars = None
+        self.active_line_num = None
 
-        for vars_name in ('args', 'retval', 'locals'):
-            w_vars_tree = TreeWidget()
-            tree_data = self._create_tree_data(which_vars=vars_name)
-            w_vars_tree.build(tree_data)
-            self.addTab(w_vars_tree, vars_name)
+        self.layout = QtWidgets.QHBoxLayout(self)
+        self.layout.addWidget(self._w_code)
 
-    def _create_tree_data(self, which_vars):
-        vars_ = getattr(self.call, which_vars)
-        if which_vars == 'retval':
-            vars_ = {which_vars: vars_}
-        tree_data = {}
-        for k, v in vars_.items():
-            tree_data[str(k)] = {f'value: {str(v)}\ntype: {type(v)}': {}}
-        return tree_data
+    def _reset_vars_widget(self):
+        if self._w_vars is not None:
+            self._w_vars.setParent(None)
+
+    def _add_vars_widget(self):
+        self._w_vars = CallVarsWidget(
+            parent=self,
+            call=self.call,
+            line_num=self.active_line_num
+        )
+        self.layout.addWidget(self._w_vars)
+
+    def on_double_click(self):
+        # TODO: terrible hack.
+        if self.active_line_num is not None:
+            self._reset_vars_widget()
+            self._add_vars_widget()
 
 
 class CallInspectWidget(QtWidgets.QWidget):
@@ -147,13 +196,11 @@ class CallInspectWidget(QtWidgets.QWidget):
         super().__init__(parent=parent)
         self.call = call
         self._w_info = CallInfoWidget(parent=self, call=call)
-        self._w_src = CallSourceWidget(parent=self, call=call)
-        self._w_vars = CallVarsWidget(parent=self, call=call)
+        self._w_src = CallSourceInspectWidget(parent=self, call=call)
 
         self.layout = QtWidgets.QHBoxLayout(self)
         self.layout.addWidget(self._w_info)
         self.layout.addWidget(self._w_src)
-        self.layout.addWidget(self._w_vars)
 
 
 class MainWindow(QtWidgets.QWidget):
