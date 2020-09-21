@@ -1,3 +1,4 @@
+import os
 import sys
 import inspect
 import re
@@ -8,10 +9,23 @@ from copy import copy
 from time import time
 from datetime import datetime
 from collections import defaultdict
+from functools import wraps
 
+from .gui_qt import Tracer
+
+__version__ = '1.0.1'
 
 CLASS_NAME_REGEXP = re.compile(r'class\s+([\w_\d]+):')
 SELF_ARG_REGEXP = re.compile(r'\(\s*self[\s,)]+')
+
+
+def _get_root_path(path):
+    if not os.path.exists(path):
+        raise FileNotFoundError(path)
+
+    path = os.path.abspath(path)
+    root, _ = os.path.split(path)
+    return Path(root)
 
 
 def _matches_root(root, path):
@@ -24,7 +38,7 @@ def _recognize_frame(root, frame):
 
 
 def _get_frame_path(frame):
-    return frame.f_code.co_filename
+    return os.path.abspath(frame.f_code.co_filename)
 
 
 def _get_frame_locals(frame):
@@ -47,6 +61,9 @@ def _find_method_class_name(lines):
 
 
 def _is_any_method(first_lineno, lines):
+    if not lines:
+        return False
+
     first_line = lines[first_lineno]
     if SELF_ARG_REGEXP.search(first_line) is not None:
         return True
@@ -78,9 +95,21 @@ def _get_frame_local_name(frame):
 
 
 def _get_frame_qual_name(root, frame):
+    if not os.path.exists(frame.f_code.co_filename):
+        return frame.f_code.co_filename
+
     frame_name = _get_frame_local_name(frame)
-    path = Path(frame.f_code.co_filename)
-    path = path.relative_to(root)
+    path = _get_frame_path(frame)
+    path = Path(path)
+
+    # when this func is used to get caller's name,
+    # sometimes caller might not be located under the `root`
+    # (i.e. first call of entry point done from `[...]/tracer.core`).
+    try:
+        path = path.relative_to(root)
+    except ValueError:
+        return frame_name
+
     path_name = '.'.join(path.parts[:-1])
     if path_name:
         frame_name = f'{path_name}.{frame_name}'
@@ -190,7 +219,9 @@ class Run:
         locals_ = _get_frame_locals(frame)
         num = frame.f_lineno
         with open(frame.f_code.co_filename, 'r') as f:
-            src = f.readlines()[num - 1]
+            lines = f.readlines()
+            src = lines[num - 1] if lines else ''
+
         ln = Line(frame=frame, num=num, src=src, locals=locals_)
         call = self.get_call_by_frame(frame)
         call.add_line(ln)
@@ -234,24 +265,9 @@ class Run:
         return data
 
 
-def _get_root_path(func):
-    mod = func.__module__
-    top_pkg = mod.split('.')[0]
-    fpath = Path(func.__code__.co_filename)
-    parts = fpath.parts
-    try:
-        top_pkg_ix = parts.index(top_pkg)
-        root = Path(*parts[:top_pkg_ix])
-        assert fpath.as_posix().startswith(root.as_posix())
-        return root
-    except (ValueError, AssertionError):
-        msg = f'cannot setup tracing at entry `{mod}` at {fpath}.'
-        raise Exception(msg)
-
-
-def trace(func, args, kwargs=None):
-    kwargs = kwargs or {}
-    root = _get_root_path(func)
+def trace(func):
+    path = func.__code__.co_filename
+    root = _get_root_path(path)
     run = Run(root=root)
 
     def tracer(frame, event, arg):
@@ -265,7 +281,13 @@ def trace(func, args, kwargs=None):
 
         return tracer
 
-    sys.settrace(tracer)
-    func(*args, **kwargs)
-    sys.settrace(None)
-    return run
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        sys.settrace(tracer)
+        rv = func(*args, **kwargs)
+        sys.settrace(None)
+        app = Tracer(run)
+        app.exec()
+        return rv
+
+    return wrapper
