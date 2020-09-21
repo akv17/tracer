@@ -1,3 +1,3 @@
-from .tracer import trace, BaseMatcher, EqualsMatcher
+from .core import trace
 
-__version__ = '0.2.4'
+__all__ = ['trace']
