@@ -11,7 +11,7 @@ from datetime import datetime
 from collections import defaultdict
 from functools import wraps
 
-from .gui_qt import Tracer
+from .gui import TracerApp
 
 __version__ = '1.0.1'
 
@@ -286,7 +286,7 @@ def trace(func):
         sys.settrace(tracer)
         rv = func(*args, **kwargs)
         sys.settrace(None)
-        app = Tracer(run)
+        app = TracerApp(run)
         app.exec()
         return rv
 
