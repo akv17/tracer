@@ -1,4 +1,4 @@
-from tracer.gui_qt import Tracer
+from tracer.gui import Tracer
 from tests.test_proj.main import main
 
 tracer = Tracer()
