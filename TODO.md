@@ -1,1 +1,0 @@
-1. deal with generators' yields
