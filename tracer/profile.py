@@ -27,26 +27,14 @@ class Call:
     runtime: float
 
 
-class Profile:
+class Stats:
 
-    def __init__(self):
-        self._profiler = None
-        self._data = None
+    def __init__(self, funcs):
+        self._funcs = funcs
 
-    def __enter__(self):
-        self._profiler = cProfile.Profile()
-        self._profiler.enable()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self._profiler.disable()
-        if exc_type is None:
-            self._parse_stats()
-        self._profiler = None
-        return False
-
-    def _parse_stats(self):
-        stats = pstats.Stats(self._profiler).stats  # noqa
+    @classmethod
+    def from_profiler(cls, profiler):
+        stats = pstats.Stats(profiler).stats  # noqa
         funcs = {}
         for dst, (*_, callers) in stats.items():
             if dst not in funcs:
@@ -69,4 +57,24 @@ class Profile:
                 func_src.add_callee(call)
                 func_dst.add_caller(call)
         funcs = list(funcs.values())
-        self._data = funcs
+        obj = cls(funcs)
+        return obj
+
+
+class Profile:
+
+    def __init__(self):
+        self._profiler = None
+        self._stats = None
+
+    def __enter__(self):
+        self._profiler = cProfile.Profile()
+        self._profiler.enable()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._profiler.disable()
+        if exc_type is None:
+            self._stats = Stats.from_profiler(self._profiler)
+        self._profiler = None
+        return False
