@@ -11,12 +11,21 @@ class Function:
     line: int = field(repr=False)
     callers: Any = field(repr=False, default_factory=list)
     callees: Any = field(repr=False, default_factory=list)
+    _runtime_inner: float = field(default=None, repr=False)
+
+    def set_inner_runtime(self, value):
+        object.__setattr__(self, '_runtime_inner', value)
 
     def add_caller(self, call):
         self.callers.append(call)
 
     def add_callee(self, call):
         self.callees.append(call)
+
+    @property
+    def runtime(self):
+        value = self._runtime_inner + sum([c.runtime for c in self.callees] or [0])
+        return value
 
 
 @dataclass(frozen=True)
@@ -36,23 +45,32 @@ class Stats:
 def _create_stats_from_profiler(profiler):
     stats = pstats.Stats(profiler).stats  # noqa
     funcs = {}
-    for dst, (*_, callers) in stats.items():
+    for dst, (_, nc, tt, ct, callers) in stats.items():
         if dst not in funcs:
             file, line, name = dst
-            func = Function(name=name, file=file, line=line)
+            func = Function(
+                name=name,
+                file=file,
+                line=line,
+            )
             funcs[dst] = func
         func_dst = funcs[dst]
-        for src, (_, nc, _, ct) in callers.items():
+        func_dst.set_inner_runtime(tt)
+        for src, (_, nc_, tt_, ct_) in callers.items():
             if src not in funcs:
                 file, line, name = src
-                func = Function(name=name, file=file, line=line)
+                func = Function(
+                    name=name,
+                    file=file,
+                    line=line,
+                )
                 funcs[src] = func
             func_src = funcs[src]
             call = Call(
                 src=func_src,
                 dst=func_dst,
-                num=nc,
-                runtime=ct,
+                runtime=ct_,
+                num=nc_,
             )
             func_src.add_callee(call)
             func_dst.add_caller(call)
