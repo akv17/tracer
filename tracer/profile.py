@@ -71,6 +71,8 @@ class _CreateStatsCommand:
     def _create_module_name(self, file):
         if file == '~':
             mod = '<builtins>'
+        elif file == '<string>':
+            mod = '<main>'
         elif self.fs_root not in file:
             # TODO: figure out real module
             mod = '<packages>'
