@@ -26,9 +26,9 @@ class View:
     def __init__(self):
         self.profile = None
 
-    def run(self):
+    def _render_global(self):
         funcs = self.profile.stats.list_funcs()
-        df_recs = [
+        data = [
             {
                 'name': f.name,
                 'runtime': f.runtime,
@@ -37,17 +37,19 @@ class View:
             }
             for f in funcs
         ]
-        st.write('## Global runtime')
-        st.dataframe(df_recs)
+        st.write('### Global')
+        st.dataframe(data)
 
-        st.write('## Function runtime')
+    def _render_func(self):
+        funcs = self.profile.stats.list_funcs()
         qualname_map = {f.qualname: f for f in funcs}
-        target_funcs = sorted(qualname_map)
-        target_funcs = [''] + target_funcs
-        target_func = st.selectbox('Select Function', options=target_funcs)
-        if target_func:
-            st.write('#### Own')
-            func = qualname_map[target_func]
+        options = sorted(qualname_map)
+        options = [''] + options
+        st.write('### Function')
+        func = st.selectbox('Select function to display detailed info:', options=options)
+        if func:
+            st.write('#### Info')
+            func = qualname_map[func]
             data = {
                 'name': func.name,
                 'module': func.module,
@@ -77,6 +79,10 @@ class View:
                 for call in func.callers
             ]
             st.write(data)
+
+    def run(self):
+        self._render_global()
+        self._render_func()
 
 
 class App:
