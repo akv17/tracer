@@ -10,6 +10,12 @@ class Line:
     lineno: int
     vars: dict = field(repr=False)
 
+    def get_src(self):
+        with open(self.file, 'r') as f:
+            lines = f.readlines()
+            src = lines[self.lineno - 1]
+            return src
+
 
 @dataclass(frozen=True)
 class Call:
