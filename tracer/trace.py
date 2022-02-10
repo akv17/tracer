@@ -24,6 +24,7 @@ class Call:
     lines: list = field(repr=False, default_factory=list)
     rv: Any = field(repr=False, default=None)
     exc: Any = field(repr=False, default=None)
+    stack: Any = field(repr=False, default=None)
 
     def add_line(self, obj):
         self.lines.append(obj)
@@ -33,6 +34,9 @@ class Call:
 
     def set_exc(self, e):
         object.__setattr__(self, 'exc', e)
+
+    def set_stack(self, values):
+        object.__setattr__(self, 'stack', values)
 
 
 class Stack:
@@ -104,6 +108,17 @@ class Trace:
         elif event == 'return':
             call = self._stack.pop_call()
             call.set_rv(arg)
+            f_back = frame.f_back
+            stack = [f_back]
+            while f_back is not None and len(stack) < 5:
+                f_back = f_back.f_back
+                stack.append(f_back)
+            stack = [
+                f'{f.f_code.co_name}:{f.f_lineno}'
+                for f in stack
+            ]
+            stack = stack[::-1]
+            call.set_stack(stack)
         elif event == 'exception':
             call = self._stack.pop_call()
             call.set_exc(arg)
