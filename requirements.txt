@@ -6,4 +6,4 @@ PySide2==5.15.1
 QDarkStyle==2.8.1
 QtPy==1.9.0
 shiboken2==5.15.1
-zipp==3.1.0
+zipp==3.19.1
